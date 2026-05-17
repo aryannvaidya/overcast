@@ -232,36 +232,43 @@ const SliderRow = ({
 };
 
 const PoweredByPill = ({ label, icon }: { label: string; icon: string }) => (
-  <div className="flex items-center gap-3 px-6 py-3.5 rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-inner">
+  <div className="flex items-center gap-3 px-6 py-4 rounded-[24px] bg-white/[0.03] border border-white/5 backdrop-blur-2xl transition-all hover:bg-white/[0.05]">
     <span className="text-[20px] filter drop-shadow-sm leading-none flex items-center justify-center">{icon}</span>
-    <span className="text-[15px] font-bold text-app-text/90 tracking-tight whitespace-nowrap">{label}</span>
+    <span className="text-[14px] font-bold text-app-text tracking-tight uppercase">{label}</span>
   </div>
 );
 
 const LoopingWeatherIcon = () => {
   const [index, setIndex] = useState(0);
-  const icons = ['Sun', 'Cloud', 'CloudLightning', 'CloudRain', 'Moon'];
+  const icons = [
+    { name: 'Sun', color: 'text-yellow-400' },
+    { name: 'Cloud', color: 'text-gray-400' },
+    { name: 'CloudLightning', color: 'text-yellow-500' },
+    { name: 'CloudRain', color: 'text-blue-500' },
+    { name: 'Moon', color: 'text-blue-200' }
+  ];
   
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex((prev) => (prev + 1) % icons.length);
-    }, 2000);
+    }, 2500);
     return () => clearInterval(timer);
   }, []);
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={icons[index]}
-        initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
-        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-        exit={{ opacity: 0, scale: 1.1, rotate: 10 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
+        key={icons[index].name}
+        initial={{ opacity: 0, scale: 0.8, filter: 'blur(10px)' }}
+        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+        exit={{ opacity: 0, scale: 1.2, filter: 'blur(10px)' }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
       >
         <WeatherIcon 
-          name={icons[index] as any} 
-          className="w-16 h-16 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" 
-          style="coloured" 
+          name={icons[index].name as any} 
+          className={cn("w-12 h-12", icons[index].color)} 
+          style="outline"
+          strokeWidth={1.8}
         />
       </motion.div>
     </AnimatePresence>
@@ -377,95 +384,67 @@ const SettingsScreen = ({ settings: globalSettings, onUpdate, onClose, activeWea
               onClick={() => {
                 handleBack();
               }}
-              className="flex items-center text-app-text"
+              className="px-4 py-2 bg-app-text/5 rounded-full text-[17px] font-medium text-app-text active:scale-95 transition-all"
             >
-              <span className="text-[17px] font-medium text-app-text">Back</span>
+              Back
             </button>
           </header>
 
           <div className="flex flex-col items-center px-4">
-             <motion.div 
-               style={{ 
-                 perspective: 1000 
-               }}
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               className="flex flex-col items-center text-center mb-16 w-full"
-             >
-                <motion.div 
-                  className="flex items-center gap-5 mb-4"
-                  animate={{ 
-                    y: [0, -10, 0],
-                  }}
-                  transition={{ 
-                    duration: 4, 
-                    repeat: Infinity, 
-                    ease: "easeInOut" 
-                  }}
-                >
-                   <motion.div 
-                     className="relative"
-                     animate={{ 
-                       x: [0, 5, -5, 0],
-                       y: [0, -10, 10, 0],
-                       rotate: [0, -2, 2, 0]
-                     }}
-                     transition={{ 
-                       duration: 6, 
-                       repeat: Infinity, 
-                       ease: "easeInOut" 
-                     }}
-                   >
-                     <LoopingWeatherIcon />
-                   </motion.div>
-                   <h1 className="text-[32px] font-black tracking-[-0.04em] text-app-text uppercase">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center text-center mb-16 w-full"
+              >
+                <div className="flex items-center gap-3 mb-6 bg-white/[0.03] px-8 py-5 rounded-[40px] border border-white/5 shadow-2xl">
+                   <LoopingWeatherIcon />
+                   <h1 className="text-[28px] font-black tracking-[-0.04em] text-app-text uppercase">
                      Nimbus Weather
                    </h1>
-                </motion.div>
-                <div className="h-px w-12 bg-app-text/10" />
-             </motion.div>
-             
-             <div className="bg-app-surface/40 backdrop-blur-md border border-app-border rounded-[24px] overflow-hidden w-full mb-16 shadow-sm">
-                <button 
-                  onClick={() => {
-                    Haptic.light(localSettings.hapticEnabled);
-                    setActiveSubView('agreement');
-                    pushPanel(() => setActiveSubView('none'), 'agreement');
-                  }}
-                  className="w-full px-6 py-5 flex items-center justify-between text-left active:bg-white/5 transition-colors border-b border-app-border/50"
-                >
-                   <span className="text-[16px] text-app-text font-medium">Weather User Agreement</span>
-                   <Icons.ChevronRight className="w-5 h-5 text-app-text-dim/30" />
-                </button>
-                <button 
-                  onClick={() => {
-                    Haptic.light(localSettings.hapticEnabled);
-                    setActiveSubView('privacy');
-                    pushPanel(() => setActiveSubView('none'), 'privacy');
-                  }}
-                  className="w-full px-6 py-5 flex items-center justify-between text-left active:bg-white/5 transition-colors"
-                >
-                   <span className="text-[16px] text-app-text font-medium">Weather Privacy Notice</span>
-                   <Icons.ChevronRight className="w-5 h-5 text-app-text-dim/30" />
-                </button>
-             </div>
-
-             <div className="w-full mb-20">
-                <p className="text-[14px] font-black text-app-text/40 uppercase tracking-[0.25em] mb-10 text-center">Powered by</p>
-                <div className="flex flex-wrap justify-center gap-4">
-                   <PoweredByPill label="Open-Meteo" icon="🌤️" />
-                   <PoweredByPill label="WAQI" icon="💨" />
-                   <PoweredByPill label="Leaflet" icon="🗺️" />
-                   <PoweredByPill label="Geolocation API" icon="📍" />
                 </div>
-             </div>
+                <p className="text-[14px] font-black text-app-text/40 uppercase tracking-[0.4em]">Built with precision</p>
+              </motion.div>
+              
+              <div className="bg-app-surface/40 backdrop-blur-md border border-app-border rounded-[32px] overflow-hidden w-full mb-12 shadow-sm">
+                 <button 
+                   onClick={() => {
+                     Haptic.light(localSettings.hapticEnabled);
+                     setActiveSubView('agreement');
+                     pushPanel(() => setActiveSubView('none'), 'agreement');
+                   }}
+                   className="w-full px-8 py-6 flex items-center justify-between text-left active:bg-white/5 transition-colors border-b border-app-border/50"
+                 >
+                    <span className="text-[17px] text-app-text font-semibold">Weather User Agreement</span>
+                    <Icons.ChevronRight className="w-5 h-5 text-app-text-dim/30" />
+                 </button>
+                 <button 
+                   onClick={() => {
+                     Haptic.light(localSettings.hapticEnabled);
+                     setActiveSubView('privacy');
+                     pushPanel(() => setActiveSubView('none'), 'privacy');
+                   }}
+                   className="w-full px-8 py-6 flex items-center justify-between text-left active:bg-white/5 transition-colors"
+                 >
+                    <span className="text-[17px] text-app-text font-semibold">Weather Privacy Notice</span>
+                    <Icons.ChevronRight className="w-5 h-5 text-app-text-dim/30" />
+                 </button>
+              </div>
 
-             <div className="flex flex-col items-center gap-1 text-center">
-                <p className="text-[11px] font-bold text-app-text uppercase tracking-[0.15em] opacity-30">Built with precision</p>
-                <p className="text-[11px] font-bold text-app-text opacity-30">&copy; 2026 Nimbus Weather</p>
-                <div className="h-10" />
-                <p className="text-[12px] font-black text-app-text/40 opacity-50 tracking-widest uppercase">Version 1.0.0</p>
-             </div>
+              <div className="w-full mb-16">
+                 <p className="text-[11px] font-black text-app-text/30 uppercase tracking-[0.25em] mb-8 text-center">Powered by</p>
+                 <div className="flex flex-wrap justify-center gap-3">
+                    <PoweredByPill label="Open-Meteo" icon="🌤️" />
+                    <PoweredByPill label="WAQI" icon="💨" />
+                    <PoweredByPill label="Leaflet" icon="🗺️" />
+                    <PoweredByPill label="Geolocation" icon="📍" />
+                 </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-1 text-center pb-12">
+                 <p className="text-[11px] font-bold text-app-text opacity-30 tracking-[0.05em]">&copy; 2026 Nimbus Weather</p>
+                 <div className="h-6" />
+                 <p className="text-[12px] font-black text-app-text/60 tracking-[0.1em] uppercase">Version 1.0.0</p>
+              </div>
           </div>
         </div>
       </motion.div>

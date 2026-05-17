@@ -32,40 +32,42 @@ export function initGestures() {
     );
   };
 
-  // ── PULL INDICATOR ──────────────────────────────
-  const indicator = document.createElement("div");
-  indicator.id = "gesture-pull-indicator";
-  indicator.style.cssText = `
-    position: fixed; top: 0; left: 0; right: 0;
-    height: 65px; overflow: hidden;
-    display: flex; align-items: center; 
-    justify-content: center;
-    color: #ffffff80; font-size: 13px;
-    background: #ffffff08;
-    transform: translateY(-100%);
-    will-change: transform;
-    transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
-    z-index: 9999; pointer-events: none;
-    font-family: system-ui, -apple-system, sans-serif;
-  `;
-  document.body.prepend(indicator);
+  const target = document.getElementById("swipe-layer") || document.body;
+  if (!target) return () => {};
 
-  // ── TOUCH START ────────────────────────────────
+  // ── PULL INDICATOR ──────────────────────────────
+  let indicator = document.getElementById("gesture-pull-indicator");
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.id = "gesture-pull-indicator";
+    indicator.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0;
+      height: 65px; overflow: hidden;
+      display: flex; align-items: center; 
+      justify-content: center;
+      color: #ffffff80; font-size: 13px;
+      background: #ffffff08;
+      transform: translateY(-100%);
+      will-change: transform;
+      transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 9999; pointer-events: none;
+      font-family: system-ui, -apple-system, sans-serif;
+    `;
+    document.body.prepend(indicator);
+  }
+
+  // Define listeners
   const onTouchStart = (e: TouchEvent) => {
     const touch = e.touches[0];
-
-    // Ignore touches starting from screen edges
     if (touch.clientX < EDGE_IGNORE || 
         touch.clientX > window.innerWidth - EDGE_IGNORE) {
       tracking = false;
       return;
     }
-
     if (isInteractive(e.target as HTMLElement)) {
       tracking = false;
       return;
     }
-
     startX    = touch.clientX;
     startY    = touch.clientY;
     startTime = Date.now();
@@ -73,69 +75,49 @@ export function initGestures() {
     window.dispatchEvent(new CustomEvent("swipe-start"));
   };
 
-  // ── TOUCH MOVE ─────────────────────────────────
   const onTouchMove = (e: TouchEvent) => {
     if (!tracking) return;
     const touch = e.touches[0];
     const dy = touch.clientY - startY;
     const dx = touch.clientX - startX;
-
-    // Handle pull indicator if moving vertically down at top of page
     if (Math.abs(dy) > Math.abs(dx) && dy > 0 && window.scrollY === 0) {
       if (rafId) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         const pull = Math.min(dy, 130);
         const translatePercent = Math.max(-100, -100 + (pull / 130) * 100);
-        indicator.style.transform = `translateY(${translatePercent}%)`;
-        indicator.textContent = 
-          pull >= PULL_THRESHOLD ? "↓ Release to refresh" 
-                                 : "↓ Pull to refresh";
+        if (indicator) {
+          indicator.style.transform = `translateY(${translatePercent}%)`;
+          indicator.textContent = pull >= PULL_THRESHOLD ? "↓ Release to refresh" : "↓ Pull to refresh";
+        }
         rafId = null;
       });
     } else {
-      // If we move horizontally or up, reset indicator
-      if (indicator.style.transform !== "translateY(-100%)") {
+      if (indicator && indicator.style.transform !== "translateY(-100%)") {
         indicator.style.transform = "translateY(-100%)";
       }
     }
   };
 
-  // ── TOUCH END ──────────────────────────────────
   const onTouchEnd = (e: TouchEvent) => {
     if (!tracking) return;
     tracking = false;
-
     const touch = e.changedTouches[0];
     const dx    = touch.clientX - startX;
     const dy    = touch.clientY - startY;
     const dt    = Date.now() - startTime;
 
-    // Reset indicator
     if (rafId) cancelAnimationFrame(rafId);
-    indicator.style.transform = "translateY(-100%)";
-    indicator.textContent  = "";
+    if (indicator) {
+      indicator.style.transform = "translateY(-100%)";
+      indicator.textContent  = "";
+    }
 
-    // 1. Check Pull to Refresh (Vertical)
     if (Math.abs(dy) > Math.abs(dx) && dy >= PULL_THRESHOLD && window.scrollY === 0) {
       window.dispatchEvent(new CustomEvent("pull-refresh"));
       return;
     }
 
-    // 2. Check Horizontal Swipe
-    // Must be fast enough to be a swipe
-    if (dt > SWIPE_MAX_TIME) {
-      window.dispatchEvent(new CustomEvent("swipe-cancel"));
-      return;
-    }
-
-    // Must be more horizontal than vertical
-    if (Math.abs(dy) > SWIPE_MAX_VERT) {
-      window.dispatchEvent(new CustomEvent("swipe-cancel"));
-      return;
-    }
-
-    // Must exceed threshold
-    if (Math.abs(dx) < SWIPE_THRESHOLD) {
+    if (dt > SWIPE_MAX_TIME || Math.abs(dy) > SWIPE_MAX_VERT || Math.abs(dx) < SWIPE_THRESHOLD) {
       window.dispatchEvent(new CustomEvent("swipe-cancel"));
       return;
     }
@@ -149,11 +131,9 @@ export function initGestures() {
 
   const onTouchCancel = () => {
     tracking = false;
-    indicator.style.transform = "translateY(-100%)";
+    if (indicator) indicator.style.transform = "translateY(-100%)";
     window.dispatchEvent(new CustomEvent("swipe-cancel"));
   };
-
-  const target = document.getElementById("swipe-layer") || document.body;
 
   target.addEventListener("touchstart", onTouchStart, { passive: true });
   target.addEventListener("touchmove", onTouchMove, { passive: true });
@@ -165,6 +145,6 @@ export function initGestures() {
     target.removeEventListener("touchmove", onTouchMove);
     target.removeEventListener("touchend", onTouchEnd);
     target.removeEventListener("touchcancel", onTouchCancel);
-    indicator.remove();
   };
+
 }

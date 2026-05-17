@@ -57,7 +57,7 @@ export default function App() {
     
     try {
       const s = localStorage.getItem('app_settings');
-      if (s) {
+      if (s && s !== 'undefined' && s !== 'null') {
         const parsed = JSON.parse(s);
         // Migration: Ensure theme is black
         parsed.theme = 'black';
@@ -67,7 +67,7 @@ export default function App() {
       }
       
       const l = localStorage.getItem('app_locations');
-      if (l) cachedLocations = JSON.parse(l);
+      if (l && l !== 'undefined' && l !== 'null') cachedLocations = JSON.parse(l);
       
       const idx = localStorage.getItem('app_active_index');
       if (idx) cachedIndex = parseInt(idx);
@@ -588,7 +588,7 @@ export default function App() {
       const now = Date.now();
       const timeStr = format(now, 'HH:mm');
       if (timeStr === state.settings.notificationTime) {
-        const summary = `Today: ${formatTemp(activeWeather.daily.temperatureMax[0], state.settings.unitTemp)}°${state.settings.unitTemp}, ${activeWeather.airQuality?.description} Air.`;
+        const summary = `Today: ${formatTemp(activeWeather.daily.temperatureMax[0], state.settings.unitTemp)}°${state.settings.unitTemp}${activeWeather.airQuality?.description ? `, ${activeWeather.airQuality.description} Air` : ''}.`;
         sendNotification("Nimbus Weather", summary);
       }
     };
@@ -882,25 +882,41 @@ export default function App() {
           }}
         >
           <motion.div className="absolute left-6 top-8 pointer-events-auto">
-            <motion.button 
-              onClick={() => {
-                Haptic.light(state.settings.hapticEnabled);
-                setShowCityManager(true);
-                pushPanel(() => setShowCityManager(false), 'citymanager');
-              }}
-              className="w-12 h-12 bg-app-text/5 border border-app-border rounded-full flex items-center justify-center text-app-text active:scale-95 transition-all shadow-xl"
-              initial={false}
-              animate={{
-                opacity: state.showSettings || showCityManager || isSwiping || isSwipeCommitted ? 0 : 1,
-                pointerEvents: state.showSettings || showCityManager || isSwiping || isSwipeCommitted ? 'none' : 'auto',
-                scale: state.showSettings || showCityManager ? 0.8 : 1,
-              }}
-              transition={{ 
-                duration: (isSwiping || isSwipeCommitted) ? 0 : 0.12 
-              }}
-            >
-              <Icons.LayoutGrid className="w-5 h-5 text-app-text-dim" strokeWidth={1.5} />
-            </motion.button>
+            <AnimatePresence mode="wait">
+              {state.showSettings ? (
+                <motion.button 
+                  key="settings-back"
+                  onClick={toggleSettings}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="px-5 py-2.5 bg-app-text/5 rounded-full text-[17px] font-medium text-app-text active:scale-95 transition-all"
+                >
+                  Back
+                </motion.button>
+              ) : (
+                <motion.button 
+                  key="city-manager"
+                  onClick={() => {
+                    Haptic.light(state.settings.hapticEnabled);
+                    setShowCityManager(true);
+                    pushPanel(() => setShowCityManager(false), 'citymanager');
+                  }}
+                  className="w-12 h-12 bg-app-text/5 border border-app-border rounded-full flex items-center justify-center text-app-text active:scale-95 transition-all shadow-xl"
+                  initial={false}
+                  animate={{
+                    opacity: showCityManager || isSwiping || isSwipeCommitted ? 0 : 1,
+                    pointerEvents: showCityManager || isSwiping || isSwipeCommitted ? 'none' : 'auto',
+                    scale: showCityManager ? 0.8 : 1,
+                  }}
+                  transition={{ 
+                    duration: (isSwiping || isSwipeCommitted) ? 0 : 0.12 
+                  }}
+                >
+                  <Icons.LayoutGrid className="w-5 h-5 text-app-text-dim" strokeWidth={1.5} />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           {/* Settings Button - Top Right */}
@@ -908,35 +924,14 @@ export default function App() {
             <motion.button 
               onClick={toggleSettings}
               className="group active:scale-95 transition-all w-12 h-12 flex items-center justify-center"
+              initial={false}
               animate={{
-                opacity: isSwiping || isSwipeCommitted ? 0 : 1,
+                opacity: state.showSettings || isSwiping || isSwipeCommitted ? 0 : 1,
+                pointerEvents: state.showSettings || isSwiping || isSwipeCommitted ? 'none' : 'auto',
               }}
               transition={{ duration: (isSwiping || isSwipeCommitted) ? 0 : 0.12 }}
             >
-              <AnimatePresence mode="wait">
-                {state.showSettings ? (
-                  <motion.div
-                    key="back"
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    className="flex items-center text-app-text pr-2"
-                  >
-                    <Icons.ChevronLeft className="w-6 h-6 mr-0.5" strokeWidth={2.5} />
-                    <span className="text-[17px] font-medium text-app-text">Back</span>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="settings"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="w-12 h-12 bg-app-text/5 border border-app-border rounded-full flex items-center justify-center text-app-text-dim group-hover:text-app-text transition-colors shadow-xl"
-                  >
-                    <Icons.Settings2 className="w-5 h-5" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <Icons.Settings2 className="w-5 h-5 text-app-text-dim group-hover:text-app-text transition-colors" />
             </motion.button>
           </motion.div>
 
