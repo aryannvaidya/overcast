@@ -44,8 +44,7 @@ import {
   ShieldCheck,
   Mountain,
   Plane,
-  Map,
-  Zap
+  Map
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
@@ -96,8 +95,7 @@ export const RawIcons = {
   ShieldCheck,
   Mountain,
   Plane,
-  Map,
-  Zap
+  Map
 };
 
 export type IconType = keyof typeof RawIcons;
@@ -133,7 +131,6 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       case 'CloudMoon': return 'text-blue-300';
       case 'CloudRain': case 'CloudDrizzle': return 'text-blue-400';
       case 'CloudLightning': return 'text-yellow-500';
-      case 'Zap': return 'text-rose-500';
       case 'Snowflake': return 'text-cyan-200';
       case 'Wind': return 'text-sky-400';
       case 'Droplets': return 'text-cyan-400';

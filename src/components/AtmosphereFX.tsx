@@ -21,127 +21,93 @@ export default function AtmosphereFX({ weatherCode, isDay, moonPhase, locationNa
 
   useEffect(() => {
     setIsVisible(true);
-    const timer = setTimeout(() => setIsVisible(false), 12000); // Effect durations roughly match animations
-    return () => {
-      setIsVisible(false);
-      clearTimeout(timer);
-    };
+    const timer = setTimeout(() => setIsVisible(false), 7500); 
+    return () => clearTimeout(timer);
   }, [locationName, weatherCode]);
 
   const getConfig = () => {
-    // 1. Thunderstorm: Dark Grey
+    // 1. Thunderstorm: Deep Dramatic Aura
     if (weatherCode >= 95) {
       return {
-        colors: ['rgba(30, 41, 59, 0.7)', 'rgba(71, 85, 105, 0.5)'],
+        colors: ['rgba(30, 41, 59, 0.6)', 'rgba(51, 65, 85, 0.3)'],
         hasFlashes: true,
       };
     }
-    
-    // 2. Snow: Snow particles + white grey clouds
-    if ((weatherCode >= 71 && weatherCode <= 77) || weatherCode === 85 || weatherCode === 86) {
-      return {
-        colors: isDay 
-          ? ['rgba(241, 245, 249, 0.5)', 'rgba(203, 213, 225, 0.3)'] 
-          : ['rgba(148, 163, 184, 0.4)', 'rgba(71, 85, 105, 0.2)'],
-        hasSnow: true,
-        hasClouds: true,
-      };
-    }
-
-    // 3. Overcast / Cloudy: White Grey
+    // 2. Overcast: Boundless Grey White Gradient
     if (weatherCode === 3) {
       return {
-        colors: isDay 
-          ? ['rgba(241, 245, 249, 0.6)', 'rgba(203, 213, 225, 0.4)'] 
-          : ['rgba(148, 163, 184, 0.35)', 'rgba(71, 85, 105, 0.2)'],
+        colors: isDay ? ['rgba(209, 213, 219, 0.35)', 'rgba(243, 244, 246, 0.2)'] : ['rgba(75, 85, 99, 0.3)', 'rgba(156, 163, 175, 0.15)'],
+        hasClouds: false,
+      };
+    }
+    // 2.1 Fog: Misty Drift
+    if (weatherCode === 45 || weatherCode === 48) {
+      return {
+        colors: isDay ? ['rgba(203, 213, 225, 0.3)', 'rgba(241, 245, 249, 0.15)'] : ['rgba(15, 23, 42, 0.4)', 'rgba(30, 41, 59, 0.2)'],
         hasClouds: true,
       };
     }
-
-    // 4. Partly Cloudy (Code 2)
-    if (weatherCode === 2) {
-      if (isDay) {
-        return {
-          colors: ['rgba(241, 245, 249, 0.5)', 'rgba(226, 232, 240, 0.3)'], // White-Grey
-          hasDrift: true,
-        };
-      } else {
-        // Moon with cloud - no stars but blue
-        return {
-          colors: ['rgba(30, 58, 138, 0.45)', 'rgba(30, 27, 75, 0.25)'], // Blue
-          hasClouds: true,
-        };
-      }
-    }
-
-    // 5. Rain / Drizzle: Dark Grey-Blue
-    if (weatherCode >= 45 && weatherCode <= 82) {
+    // 3. Rain / Drizzle: Deep Indigo Mist
+    if (weatherCode >= 51 && weatherCode <= 82) {
       return {
-        colors: isDay 
-          ? ['rgba(71, 85, 105, 0.4)', 'rgba(30, 58, 138, 0.25)'] 
-          : ['rgba(30, 41, 59, 0.5)', 'rgba(15, 23, 42, 0.3)'],
+        colors: isDay ? ['rgba(37, 99, 235, 0.25)', 'rgba(96, 165, 250, 0.1)'] : ['rgba(30, 27, 75, 0.5)', 'rgba(49, 46, 129, 0.2)'],
         hasMist: true,
       };
     }
-
-    // 6. Clear / Mainly Clear (Code 0, 1)
-    if (isDay) {
-      // ☀️ - yellow gradient
+    // 4. Partly Cloudy: Dynamic Skylight
+    if (weatherCode === 1 || weatherCode === 2) {
       return {
-        colors: ['rgba(251, 191, 36, 0.4)', 'rgba(255, 255, 255, 0.15)'],
+        colors: isDay ? ['rgba(251, 191, 36, 0.2)', 'rgba(56, 189, 248, 0.15)'] : ['rgba(30, 58, 138, 0.3)', 'rgba(255, 255, 255, 0.05)'],
+        hasDrift: true,
       };
-    } else {
-      // Night Logic
-      const moonPhaseSafe = Number.isFinite(moonPhase) ? moonPhase : 0.5;
-      const phaseLum = Math.max(0, Math.min(1, 1 - Math.abs(0.5 - moonPhaseSafe) * 2));
-      
-      if (phaseLum < 0.15) {
-        // 🌑 no moon - blue sky with stars
-        return {
-          colors: ['rgba(29, 78, 216, 0.35)', 'rgba(30, 27, 75, 0.15)'],
-          hasStars: true,
-        };
-      } else {
-        // 🌕 - whitish blue with stars
-        return {
-          colors: ['rgba(191, 219, 254, 0.45)', 'rgba(255, 255, 255, 0.1)'],
-          hasStars: true,
-        };
-      }
     }
+    // 5. Clear Day
+    if (isDay) {
+      return {
+        colors: ['rgba(251, 191, 36, 0.3)', 'rgba(255, 255, 255, 0.1)'],
+      };
+    }
+    // 6. Clear Night
+    const moonPhaseSafe = Number.isFinite(moonPhase) ? moonPhase : 0.5;
+    const phaseLum = Math.max(0, Math.min(1, 1 - Math.abs(0.5 - moonPhaseSafe) * 2));
+    const moonOpacity = Math.max(0, Math.min(1, 0.15 + (phaseLum * 0.25)));
+    return {
+      colors: [`rgba(255, 255, 255, ${moonOpacity || 0.25})`, 'rgba(30, 27, 75, 0.2)'],
+      hasStars: true,
+    };
   };
 
   const config = getConfig();
 
   return (
     <AnimatePresence>
-      {isVisible && locationName && config && (
+      {isVisible && locationName && (
         <motion.div
-          key={`${locationName}-${weatherCode}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed top-0 left-0 right-0 z-[100] h-[50vh] pointer-events-none overflow-hidden gpu"
+          transition={{ duration: 1.2 }}
+          className="fixed top-0 left-0 right-0 z-[100] h-[30vh] pointer-events-none overflow-hidden gpu"
           style={{ 
-            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0) 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0) 100%)'
+            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0) 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0) 100%)'
           }}
         >
           {/* Depth Layer 1: Massive Ambient Base Glow */}
           <motion.div
             style={{
+              y: y1,
               background: `radial-gradient(circle at center, ${config.colors[1] || config.colors[0]}, transparent 80%)`
             }}
-            initial={{ scale: 1.4, opacity: 0 }}
+            initial={{ scale: 0.8, opacity: 0 }}
             animate={{ 
-              scale: 1.8, 
-              opacity: [0, 0.6, 0.6, 0],
+              scale: 1.6, 
+              opacity: [0, 0.5, 0.5, 0],
             }}
             transition={{ 
-              duration: 10, 
+              duration: 7.5, 
               ease: "easeInOut",
-              times: [0, 0.2, 0.8, 1]
+              times: [0, 0.3, 0.7, 1]
             }}
             className="absolute top-[-40%] left-1/2 -translate-x-1/2 w-[220%] aspect-square rounded-full blur-[140px]"
           />
@@ -149,18 +115,19 @@ export default function AtmosphereFX({ weatherCode, isDay, moonPhase, locationNa
           {/* Depth Layer 2: Focused Core Atmosphere Animation */}
           <motion.div
             style={{
+              y: y2,
               background: `radial-gradient(circle at center, ${config.colors[0]}, transparent 70%)`
             }}
-            initial={{ scale: 1.0, opacity: 0, y: 0 }}
+            initial={{ scale: 0.6, opacity: 0, y: -20 }}
             animate={{ 
               scale: 1.3, 
-              opacity: [0, 0.9, 0.9, 0],
-              y: [0, -20] 
+              opacity: [0, 1, 1, 0],
+              y: 20 
             }}
             transition={{ 
-              duration: 8, 
-              ease: "easeInOut",
-              times: [0, 0.2, 0.8, 1],
+              duration: 6.5, 
+              ease: [0.22, 1, 0.36, 1], 
+              times: [0, 0.25, 0.75, 1],
               delay: 0.5
             }}
             className="absolute top-[-50%] left-1/2 -translate-x-1/2 w-[180%] aspect-square rounded-full blur-[100px]"
@@ -168,7 +135,7 @@ export default function AtmosphereFX({ weatherCode, isDay, moonPhase, locationNa
 
           {/* Atmospheric Mist/Glow Pulses (No structure, just color) */}
           {(config.hasClouds || config.hasDrift || config.hasMist) && (
-            <div className="absolute inset-0">
+            <motion.div style={{ y: yStars }} className="absolute inset-0">
                {Array.from({ length: 2 }).map((_, i) => (
                  <motion.div
                   key={`glow-${i}`}
@@ -187,12 +154,12 @@ export default function AtmosphereFX({ weatherCode, isDay, moonPhase, locationNa
                   style={{ top: `${10 + i * 20}%` }}
                  />
                ))}
-            </div>
+            </motion.div>
           )}
 
           {/* Realistic Lightning Flashes - Improved Timing */}
           {config.hasFlashes && (
-            <div className="absolute inset-0">
+            <motion.div style={{ y: y2 }} className="absolute inset-0">
               <motion.div
                 animate={{ 
                   opacity: [0, 0.4, 0, 0.3, 0],
@@ -206,64 +173,31 @@ export default function AtmosphereFX({ weatherCode, isDay, moonPhase, locationNa
                 }}
                 className="absolute inset-x-0 top-0 h-full bg-app-text/10 blur-[140px]"
               />
-            </div>
-          )}
-
-          {/* Snow Particles */}
-          {(config as any).hasSnow && (
-            <div className="absolute inset-0">
-              {Array.from({ length: 30 }).map((_, i) => (
-                <motion.div
-                  key={`snow-${i}`}
-                  initial={{ 
-                    top: -20, 
-                    left: `${Math.random() * 100}%`,
-                    opacity: 0,
-                    scale: 0.5 + Math.random() * 0.5
-                  }}
-                  animate={{ 
-                    top: '100%',
-                    left: `${(parseFloat(`${Math.random() * 100}`) - 15) + Math.random() * 30}%`,
-                    opacity: [0, 0.8, 0.8, 0],
-                  }}
-                  transition={{ 
-                    duration: 5 + Math.random() * 5, 
-                    repeat: Infinity,
-                    delay: Math.random() * 12,
-                    ease: "linear"
-                  }}
-                  className="absolute w-1.5 h-1.5 bg-white rounded-full blur-[1px]"
-                />
-              ))}
-            </div>
+            </motion.div>
           )}
 
           {/* Ethereal Stars - Higher Density & Depth */}
           {config.hasStars && (
-            <div className="absolute inset-0 opacity-40">
+            <motion.div style={{ y: yStars }} className="absolute inset-0 opacity-40">
               {Array.from({ length: 24 }).map((_, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0 }}
-                  animate={{ 
-                    opacity: [0, 0.4, 0.8, 0.4, 0],
-                    scale: [0.8, 1, 1.2, 1, 0.8]
-                  }}
+                  animate={{ opacity: [0, 0.8, 0] }}
                   transition={{ 
-                    duration: 3 + Math.random() * 4, 
-                    delay: Math.random() * 8,
-                    repeat: Infinity,
-                    ease: "easeInOut"
+                    duration: 4 + Math.random() * 4, 
+                    delay: Math.random() * 6,
+                    repeat: Infinity
                   }}
-                  className="absolute w-[2px] h-[2px] bg-white rounded-full"
+                  className="absolute w-[1px] h-[1px] bg-app-text rounded-full"
                   style={{
-                    top: `${Math.random() * 85}%`,
+                    top: `${Math.random() * 90}%`,
                     left: `${Math.random() * 100}%`,
-                    boxShadow: '0 0 4px 1px rgba(255, 255, 255, 0.3)'
+                    boxShadow: '0 0 6px 1px var(--text-secondary)'
                   }}
                 />
               ))}
-            </div>
+            </motion.div>
           )}
         </motion.div>
       )}

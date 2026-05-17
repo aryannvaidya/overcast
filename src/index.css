@@ -32,46 +32,10 @@
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   user-select: none;
-  /* Hide scrollbar on all elements */
-  scrollbar-width: none;        /* Firefox */
-  -ms-overflow-style: none;     /* IE/Edge */
-}
-
-*::-webkit-scrollbar {
-  display: none;                /* Chrome, Safari, Brave */
-  width: 0;
-  height: 0;
-}
-
-/* Make sure scroll still works, just hidden */
-.city-card,
-.settings-panel,
-.about-page,
-.hourly-forecast-container,
-.scroll-container,
-body {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
 input, textarea, [contenteditable="true"] {
   user-select: text;
-}
-
-/* Tell browser this element handles 
-   horizontal touch itself */
-#swipe-layer {
-  touch-action: pan-y; /* allow vertical scroll only */
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* Hourly forecast handles its OWN horizontal scroll */
-.hourly-forecast,
-[class*="hourly"] {
-  touch-action: pan-x !important; /* browser handles this scroll */
 }
 
 /* GPU accelerate ALL animated elements */
@@ -96,9 +60,22 @@ input, textarea, [contenteditable="true"] {
 }
 
 /* Smooth scrolling and prevent bounce */
-.scroll-container {
+body, .scroll-container {
   -webkit-overflow-scrolling: touch;
   overflow-scrolling: touch;
+}
+
+body {
+  @apply bg-app-bg text-app-text antialiased overflow-x-hidden;
+  font-family: var(--font-sans);
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: pan-y pinch-zoom;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  overscroll-behavior: none;
 }
 
 /* Enable hardware acceleration for common animated elements */
@@ -113,51 +90,28 @@ input, textarea, [contenteditable="true"] {
 html {
   scroll-behavior: smooth;
   overscroll-behavior: none;
-  width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0;
-  padding: 0;
-  background: var(--bg-primary);
-  box-sizing: border-box;
 }
 
-body {
-  @apply bg-app-bg text-app-text antialiased overflow-x-hidden;
-  font-family: var(--font-sans);
-  transition: background-color 0.15s ease-out, color 0.15s ease-out;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  touch-action: pan-y pinch-zoom;
-  overscroll-behavior: none;
-  width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0;
-  padding: 0;
-  /* Extend into system bar areas */
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  box-sizing: border-box;
+/* Completely remove scrollbars */
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
-#root, .app-container {
-  background: var(--bg-primary);
-  min-height: 100dvh;
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
-/* Top bar — sit just below status bar */
-#ui-overlay, #top-bar, .safe-top {
-  padding-top: calc(env(safe-area-inset-top) + 8px);
+/* Glass effect animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Bottom content — don't hide behind nav bar */
-.bottom-content,
-.hourly-forecast,
-#city-dots,
-.safe-bottom {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
 }
 
 /* Custom Range Input Styling for iOS-like feel */
@@ -188,6 +142,8 @@ input[type=range]::-webkit-slider-thumb {
   z-index: 10;
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* Track styling already handled */
 
 /* Clear default tracks to avoid double-line effect */
 input[type=range]::-webkit-slider-runnable-track {

@@ -14,28 +14,12 @@ export function getCityKey(location: Location): string {
     .toLowerCase();
 }
 
-export const safeGet = (key: string): string | null => {
-  try { 
-    return localStorage.getItem(key); 
-  } catch { 
-    return null; 
-  }
-};
-
-export const safeSet = (key: string, val: string): void => {
-  try { 
-    localStorage.setItem(key, val); 
-  } catch { 
-    console.warn("Storage failed for key:", key); 
-  }
-};
-
 export function saveWeatherData(locationKey: string, data: WeatherData) {
   try {
-    const cacheRaw = safeGet(STORAGE_KEYS.WEATHER_CACHE);
+    const cacheRaw = localStorage.getItem(STORAGE_KEYS.WEATHER_CACHE);
     const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
     cache[locationKey] = { data, ts: Date.now() };
-    safeSet(STORAGE_KEYS.WEATHER_CACHE, JSON.stringify(cache));
+    localStorage.setItem(STORAGE_KEYS.WEATHER_CACHE, JSON.stringify(cache));
   } catch (e) {
     console.error('Failed to save weather data to cache', e);
   }
@@ -43,7 +27,7 @@ export function saveWeatherData(locationKey: string, data: WeatherData) {
 
 export function getCachedWeatherData(locationKey: string): { data: WeatherData; ts: number } | null {
   try {
-    const cacheRaw = safeGet(STORAGE_KEYS.WEATHER_CACHE);
+    const cacheRaw = localStorage.getItem(STORAGE_KEYS.WEATHER_CACHE);
     if (!cacheRaw) return null;
     const cache = JSON.parse(cacheRaw);
     const cached = cache[locationKey];

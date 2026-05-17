@@ -16,7 +16,6 @@ interface CityManagerProps {
   onRemove: (index: number) => void;
   onReorder: (newLocations: Location[]) => void;
   onClose: () => void;
-  panelStackRef: React.MutableRefObject<(() => void)[]>;
 }
 
 const CityManager = ({ 
@@ -28,8 +27,7 @@ const CityManager = ({
   onAdd, 
   onRemove, 
   onReorder,
-  onClose,
-  panelStackRef
+  onClose 
 }: CityManagerProps) => {
 
   const handleRemove = (e: React.MouseEvent, index: number) => {

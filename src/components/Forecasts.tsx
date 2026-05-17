@@ -1,7 +1,7 @@
 import React from 'react';
 import { WeatherData, Settings } from '../types';
 import { WeatherIcon } from './WeatherIcons';
-import { getWeatherInfo, getHourlyIcon, shouldShowPrecip, getCurrentHourIndex } from '../services/weatherService';
+import { getWeatherInfo } from '../services/weatherService';
 import { formatTemp } from '../lib/units';
 import { motion } from 'motion/react';
 import { format, parseISO } from 'date-fns';
@@ -27,15 +27,17 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
       lastScrollPos.current = current;
     }
   };
-  // Get the city's current local time robustly using its timezone
-  const hourIndex = getCurrentHourIndex(weather.timezone, weather.hourly.time);
-  
+  // Get next 24 hours relative to the city's time
+  const baseCityTime = parseISO(weather.current.time.includes('Z') ? weather.current.time : `${weather.current.time}:00Z`);
+  const elapsedMs = Date.now() - weather.fetchedAt;
+  const cityNow = new Date(baseCityTime.getTime() + elapsedMs);
+
   const hourlyData = (weather?.hourly?.time || [])
     .map((time, i) => {
       const itemTime = parseISO(time.includes('Z') ? time : `${time}:00Z`);
       
       // Determine if it's day or night for this specific hour
-      const dateStr = time.split('T')[0];
+      const dateStr = format(itemTime, 'yyyy-MM-dd');
       const dayIdx = weather.daily.time.indexOf(dateStr);
       let isDay = true;
       
@@ -48,14 +50,19 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
       return {
         time: itemTime,
         temp: weather.hourly.temperature?.[i] ?? 0,
+        code: weather.hourly.weatherCode?.[i] ?? 0,
         pop: weather.hourly.precipitationProbability?.[i] ?? 0,
         isDay
       };
     })
-    .slice(hourIndex, hourIndex + 24);
+    .filter(item => {
+      // Comparison works because both are parsed as UTC
+      return item.time >= cityNow || (cityNow.getTime() - item.time.getTime() < 3600000 && item.time <= cityNow);
+    })
+    .slice(0, 24);
 
   return (
-    <div className="relative -mx-6 hourly-forecast">
+    <div className="relative -mx-6">
       <div className="flex items-center justify-between px-6 mb-3">
         <span className="text-[11px] font-bold tracking-[0.15em] uppercase text-app-text-dim">Hourly Forecast</span>
       </div>
@@ -65,7 +72,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
         className="flex gap-3 overflow-x-auto no-scrollbar pb-4 px-6 snap-x snap-mandatory scroll-smooth will-change-transform"
       >
         {hourlyData.length > 0 ? hourlyData.map((item, i) => {
-          const info = getHourlyIcon(item.pop, !item.isDay);
+          const info = getWeatherInfo(item.code, item.isDay);
           const isNow = i === 0;
           
           return (
@@ -97,7 +104,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
                   style={settings.iconStyle} 
                   className="w-7 h-7"
                 />
-                {shouldShowPrecip(item.pop) && (
+                {item.pop > 0 && (
                   <span className="text-[9px] font-bold text-cyan-400/80 tracking-tighter">
                     {item.pop}%
                   </span>
