@@ -60,20 +60,6 @@ input, textarea, [contenteditable="true"] {
   user-select: text;
 }
 
-/* Tell browser this element handles 
-   horizontal touch itself */
-#swipe-layer {
-  touch-action: pan-y; /* allow vertical scroll only */
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* Hourly forecast handles its OWN horizontal scroll */
-.hourly-forecast,
-[class*="hourly"] {
-  touch-action: pan-x !important; /* browser handles this scroll */
-}
-
 /* GPU accelerate ALL animated elements */
 .weather-card,
 .sun-arc,

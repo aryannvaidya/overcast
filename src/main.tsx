@@ -1,16 +1,19 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App';
+import App from './App.tsx';
 import './index.css';
-import {ErrorBoundary} from './components/ErrorBoundary';
+import {ErrorBoundary} from './components/ErrorBoundary.tsx';
 
 window.addEventListener('error', (event) => {
   const msg = event.message?.toLowerCase() || '';
   if (
-    msg.includes('script error') || 
-    msg.includes('failed to fetch') ||
+    msg.includes('script error') ||
+    msg.includes('failed to fetch') || 
     msg.includes('networkerror') ||
-    msg.includes('load failed')
+    msg.includes('load failed') ||
+    msg.includes('mime type') ||
+    msg.includes('unexpected token') ||
+    msg.includes('cross-origin')
   ) {
     return;
   }
@@ -25,7 +28,7 @@ window.addEventListener('error', (event) => {
       stack: event.error.stack
     } : 'None'
   };
-  console.error('Fatal Runtime Error:', JSON.stringify(errorInfo, null, 2));
+  console.error('Global capture:', JSON.stringify(errorInfo, null, 2));
 });
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -49,20 +52,10 @@ window.addEventListener('unhandledrejection', (event) => {
 window.addEventListener('touchstart', () => {}, { passive: true });
 window.addEventListener('touchmove', () => {}, { passive: true });
 
-try {
-  const rootElement = document.getElementById('root');
-  if (rootElement) {
-    const root = createRoot(rootElement);
-    root.render(
-      <StrictMode>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </StrictMode>,
-    );
-  } else {
-    console.error('Root element not found');
-  }
-} catch (e) {
-  console.error('Bootstrapping error:', e);
-}
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </StrictMode>,
+);
