@@ -79,10 +79,8 @@ Just open index.html in any browser.
 2. Go to [vercel.com](https://vercel.com)
 3. Import the repo → leave all settings default → Deploy
 
-**Option 3 — Install as PWA:**
-1. Open the live URL in Chrome on Android
-2. Tap ⋮ → *Add to Home Screen*
-3. Works like a native app with haptic feedback
+For Native apk :
+Scroll down to the Release section and download the apk file.
 
 ---
 
