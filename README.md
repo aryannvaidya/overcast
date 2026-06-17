@@ -1,45 +1,50 @@
-# Overcast ☁️
-### *Real-time weather, beautifully simple.* 
+<p align="center">
+  <img src="assest/icons/overcast.png" width="20%">
+</p>
 
-![Static Badge](https://img.shields.io/badge/License-MIT-green?style=flat-square)
-![Static Badge](https://img.shields.io/badge/PWA-Ready-purple?style=flat-square)
-![Static Badge](https://img.shields.io/badge/AQI-India_NAQI-orange?style=flat-square)
-
-Overcast weather is a clean, dark-themed weather PWA featuring real-time weather, India-standard air quality, and a polished mobile-first UI.
-
----
-
-## ✨ Features
-
-- 🌡️ **Real-time weather** — temperature, humidity, precipitation, visibility
-- 💨 **India NAQI Air Quality** — 6-level scale per CPCB standard with pollutant breakdown (PM2.5, PM10, NO₂, SO₂, O₃, CO)
-- 🌅 **Live sunrise/sunset arc** — animated sun position synced to local timezone
-- 🧭 **Wind compass** — SVG compass with Beaufort scale labels
-- 🏙️ **Multi-city navigation** — swipe left/right to switch cities
-- 📳 **Haptic feedback** — tactile response
-- ⚙️ **Settings** — customizable thresholds for rain and snow alerts
-
+<div align="center">
+  <h3>Overcast</h3>
+  <p>Overcast is a clean and not minimal weather app featuring real-time weather, hourly and daily forecasts, air quality, UV index, live radar and a polished UI.
+</p>
+</div>
 
 
 ---
 
-## Screenshots
+## ☀️ Features
 
-<div align="left">
+-  **Real-time weather** : temperature, humidity, precipitation, visibility
+- **Air Quality** : 6-level scale per CPCB standard.
+- **Live Radar** : See real-time weather radar for precipitation, temperature, cloud cover and wind speed 
+- **Live sunrise/sunset arc** : animated sun position synced to local timezone
+- **Multi-city navigation** : swipe left/right to switch cities
+- **Haptic feedback** : tactile response
+- **Settings** : customizable thresholds for rain and snow alerts
 
-<img src="screenshot/main.jpg" width="30%"/>
-&nbsp;
-<img src="screenshot/forecasts.jpg" width="30%"/>
-&nbsp;
-<img src="screenshot/Radar.jpg" width="30%"/>
 
-<br/><br/>
+---
 
-<img src="screenshot/aqi.jpg" width="30%"/>
+## 📸 Showcase
+
+
+
+<div align="centre">
+
+<img src="assest/preview/img1.jpg" width="100%"/>
+
+<img src="assest/preview/img2.jpg" width="32%"/>
 &nbsp;
-<img src="screenshot/cards.jpg" width="30%"/>
+<img src="assest/preview/img3.jpg" width="32%"/>
 &nbsp;
-<img src="screenshot/manage.jpg" width="30%"/>
+<img src="assest/preview/img4.jpg" width="32%"/>
+
+
+
+<img src="assest/preview/img5.jpg" width="32%"/>
+&nbsp;
+<img src="assest/preview/img6.jpg" width="32%"/>
+&nbsp;
+<img src="assest/preview/img7.jpg" width="32%"/>
 
 </div>
 
@@ -50,9 +55,9 @@ Overcast weather is a clean, dark-themed weather PWA featuring real-time weather
 | HTML / CSS / Vanilla JS | Core app — no frameworks |
 | Gemini 2.0 | AI-assisted development |
 | Open-Meteo API | Weather + sunrise/sunset data |
-| WAQI API | Air quality (India NAQI) |
+| WAQI API | Air quality (Worldwide) |
 | Chart.js | Forecast charts |
-| Leaflet.js | Weather map tiles |
+| Windy.com | Live Radar view |
 
 ---
 
@@ -61,13 +66,13 @@ Overcast weather is a clean, dark-themed weather PWA featuring real-time weather
 | Data | Source |
 |------|--------|
 | Weather | [Open-Meteo](https://open-meteo.com) — free, no key needed |
-| Air Quality | [WAQI](https://waqi.info) — India NAQI (CPCB standard) |
+| Air Quality | [WAQI](https://waqi.info) — Worldwide AQI (CPCB standard) |
 | Sunrise/Sunset | Open-Meteo Daily Forecast |
 | Geolocation | Browser Geolocation API |
 
 ---
 
-## 🇮🇳 India NAQI Scale
+## 💨AQI Scale
 
 | Range | Category | Color |
 |-------|----------|-------|
@@ -80,7 +85,7 @@ Overcast weather is a clean, dark-themed weather PWA featuring real-time weather
 
 ---
 
-## 🚀 Getting Started
+## 🦸Getting Started
 
 This is a single-file static web app. No build tools, no npm, no setup.
 
@@ -96,7 +101,7 @@ Just open index.html in any browser.
 
 ---
 
-## 📁 Project Structure
+## 📂Project Structure
 
 ```
 vayu-weather/
@@ -107,15 +112,17 @@ vayu-weather/
 
 ---
 
-## 🙏 Acknowledgements
+## 🙇 Acknowledgements
 
-- [Open-Meteo](https://open-meteo.com) — for providing free, open-source weather data
+- [Open-Meteo](https://open-meteo.com) — for providing f ree, open-source weather data
 - [WAQI](https://waqi.info) — for global air quality data
-- [CPCB India](https://cpcb.nic.in) — for the National AQI standard
+- [OpenStreetMap](https://openstreetmap.org) — for interactive composite weather radar mapping.
+- [AMCHARTS](https://amcharweather – for providing beautiful weather icons.
 
 ---
 
-## 📄 License
+## ⚖️ License
 
 This project is licensed under the MIT License.
+
 
