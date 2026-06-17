@@ -117,7 +117,7 @@ vayu-weather/
 - [Open-Meteo](https://open-meteo.com) — for providing f ree, open-source weather data
 - [WAQI](https://waqi.info) — for global air quality data
 - [OpenStreetMap](https://openstreetmap.org) — for interactive composite weather radar mapping.
-- [AMCHARTS](https://amcharts.com – for providing beautiful weather icons.
+- [amcharts](https://amcharts.com) – for providing beautiful weather icons.
 
 ---
 
