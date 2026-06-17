@@ -30,21 +30,21 @@
 
 <div align="centre">
 
-<img src="assest/preview/img1.jpg" width="100%"/>
+<img src="assest/preview/img1.jpg" width="93%"/>
 
-<img src="assest/preview/img2.jpg" width="32%"/>
+<img src="assest/preview/img2.jpg" width="30%"/>
 &nbsp;
-<img src="assest/preview/img3.jpg" width="32%"/>
+<img src="assest/preview/img3.jpg" width="30%"/>
 &nbsp;
-<img src="assest/preview/img4.jpg" width="32%"/>
+<img src="assest/preview/img4.jpg" width="30%"/>
 
 
 
-<img src="assest/preview/img5.jpg" width="32%"/>
+<img src="assest/preview/img5.jpg" width="30%"/>
 &nbsp;
-<img src="assest/preview/img6.jpg" width="32%"/>
+<img src="assest/preview/img6.jpg" width="30%"/>
 &nbsp;
-<img src="assest/preview/img7.jpg" width="32%"/>
+<img src="assest/preview/img7.jpg" width="30%"/>
 
 </div>
 
