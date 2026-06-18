@@ -1,0 +1,36 @@
+name: Weather Notifications
+
+on:
+  schedule:
+    # Morning summary — 7:30 AM IST = 2:00 AM UTC
+    - cron: '0 2 * * *'
+    # Night summary — 9:00 PM IST = 3:30 PM UTC
+    - cron: '30 15 * * *'
+    # Severe weather check — every 3 hours
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine notification type
+        id: type
+        run: |
+          HOUR_UTC=$(date -u +%H)
+          MIN_UTC=$(date -u +%M)
+          if [ "$HOUR_UTC" = "02" ]; then
+            echo "type=morning" >> $GITHUB_OUTPUT
+          elif [ "$HOUR_UTC" = "15" ] && [ "$MIN_UTC" = "30" ]; then
+            echo "type=night" >> $GITHUB_OUTPUT
+          else
+            echo "type=severe" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send notifications
+        env:
+          ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_REST_KEY: ${{ secrets.ONESIGNAL_REST_KEY }}
+        run: node scripts/send-notifications.js ${{ steps.type.outputs.type }}
