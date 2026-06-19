@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assest/icons/overcast.png" width="40%">
+  <img src="assest/preview/overcast.png" width="40%">
 </p>
 
 <div align="center">
