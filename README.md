@@ -92,7 +92,7 @@
 
 **Everywhere else**, Overcast uses its own pollen estimation engine that combines seasonal botanical calendars with live weather data. It factors in your climate zone, local vegetation patterns, temperature, humidity, wind, rainfall, and even time of day to estimate how much pollen is actually in the air.
 
-*Pollen forecasts outside Europe are scientifically modeled estimates derived from seasonal botanical patterns and real-time meteorological conditions. They are designed to provide meaningful allergy-risk guidance where direct pollen observations are not available, it can be inaccurate.*
+*Pollen forecasts outside Europe are modeled estimates derived from seasonal botanical patterns and real-time meteorological conditions. They are designed to provide meaningful allergy-risk guidance where direct pollen observations are not available, it can be inaccurate.*
 
 ## 🦸Getting Started
 
