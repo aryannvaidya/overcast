@@ -7,8 +7,27 @@ declare global {
   interface Window {
     OneSignalDeferred?: any[];
     OneSignal?: any;
+    gonative?: {
+      onesignal?: {
+        setTag?: (tag: { key: string; value: string }) => void;
+      };
+    };
   }
 }
+
+export const tagDeviceLocation = (cityName: string, lat: number, lon: number) => {
+  if (typeof window !== 'undefined' && window.gonative?.onesignal?.setTag) {
+    window.gonative.onesignal.setTag({
+      key: "city", value: cityName
+    });
+    window.gonative.onesignal.setTag({
+      key: "lat", value: lat.toString()
+    });
+    window.gonative.onesignal.setTag({
+      key: "lon", value: lon.toString()
+    });
+  }
+};
 
 // ============================================================================
 // STEP 1 — ONESIGNAL INIT WITH SAFE WRAPPERS

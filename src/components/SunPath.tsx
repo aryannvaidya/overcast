@@ -1,47 +1,32 @@
 import React, { useEffect } from 'react';
-import { motion, useInView, animate, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
+import { motion, useInView, animate, useMotionValue, useTransform } from 'motion/react';
 import { WeatherData, Settings } from '../types';
-import { WeatherIcon, RawIcons } from './WeatherIcons';
-import { format, parseISO, differenceInMinutes } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { cn } from '../lib/utils';
-import { Haptic } from '../lib/haptics';
+import { Translate } from '../lib/translations';
 
 interface SunPathProps {
   weather: WeatherData;
   settings: Settings;
 }
 
-const width = 350;
-const height = 150; 
-const horizonY = 90;
-const curveHeight = 60; 
-const startX = 60;
-const endX = 290;
-const centerX = (startX + endX) / 2;
-const daylightControlY = horizonY - (2 * curveHeight);
-
 const SunriseIcon = ({ className }: { className?: string }) => (
   <svg 
     viewBox="0 0 24 24" 
     fill="none" 
     stroke="currentColor" 
-    strokeWidth="1.6" 
+    strokeWidth="1.8" 
     strokeLinecap="round" 
     strokeLinejoin="round" 
-    className={cn("text-white", className)}
+    className={cn("text-amber-500", className)}
   >
     {/* Horizon line */}
-    <line x1="2" y1="18" x2="22" y2="18" />
-    {/* Sun circle (filled) */}
-    <circle cx="12" cy="14" r="4.2" fill="currentColor" />
-    {/* Up Arrow */}
-    <line x1="12" y1="9" x2="12" y2="2" />
-    <polyline points="9,5 12,2 15,5" />
-    {/* Rays */}
-    <line x1="3" y1="14" x2="5.5" y2="14" />
-    <line x1="5.5" y1="7.5" x2="7.5" y2="9.5" />
-    <line x1="18.5" y1="7.5" x2="16.5" y2="9.5" />
-    <line x1="21" y1="14" x2="18.5" y2="14" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+    {/* Archer Arrow pointing up */}
+    <line x1="12" y1="13" x2="12" y2="4" />
+    <polyline points="9,7 12,4 15,7" />
+    {/* Dome representing rising sun */}
+    <path d="M 8,18 A 4,4 0 0,1 16,18" fill="rgba(245, 158, 11, 0.12)" />
   </svg>
 );
 
@@ -50,35 +35,37 @@ const SunsetIcon = ({ className }: { className?: string }) => (
     viewBox="0 0 24 24" 
     fill="none" 
     stroke="currentColor" 
-    strokeWidth="1.6" 
+    strokeWidth="1.8" 
     strokeLinecap="round" 
     strokeLinejoin="round" 
-    className={cn("text-white", className)}
+    className={cn("text-amber-500", className)}
   >
     {/* Horizon line */}
-    <line x1="2" y1="18" x2="22" y2="18" />
-    {/* Sun circle (filled) */}
-    <circle cx="12" cy="14" r="4.2" fill="currentColor" />
-    {/* Down Arrow */}
-    <line x1="12" y1="2" x2="12" y2="9" />
-    <polyline points="9,6 12,9 15,6" />
-    {/* Rays */}
-    <line x1="3" y1="14" x2="5.5" y2="14" />
-    <line x1="5.5" y1="7.5" x2="7.5" y2="9.5" />
-    <line x1="18.5" y1="7.5" x2="16.5" y2="9.5" />
-    <line x1="21" y1="14" x2="18.5" y2="14" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+    {/* Archer Arrow pointing down */}
+    <line x1="12" y1="4" x2="12" y2="13" />
+    <polyline points="9,10 12,13 15,10" />
+    {/* Dome representing sinking sun */}
+    <path d="M 8,18 A 4,4 0 0,1 16,18" fill="rgba(245, 158, 11, 0.12)" />
   </svg>
 );
 
-const getCycleIcon = (name: string) => {
-  const cleanName = name.toLowerCase();
-  if (cleanName.includes("sunrise")) {
-    return <SunriseIcon className="w-5 h-5 text-white/95 shrink-0" />;
+const splitTimeAndAmPm = (timeStr: string) => {
+  if (!timeStr) return { val: "--:--", ampm: "" };
+  const cleaned = timeStr.trim();
+  const parts = cleaned.split(/\s+/);
+  if (parts.length >= 2) {
+    const lastPart = parts[parts.length - 1];
+    if (/^(AM|PM|am|pm)$/i.test(lastPart)) {
+      return { val: parts.slice(0, -1).join(" "), ampm: lastPart };
+    }
   }
-  if (cleanName.includes("sunset")) {
-    return <SunsetIcon className="w-5 h-5 text-white/95 shrink-0" />;
+  // Try matching directly
+  const match = cleaned.match(/^([\d:]+)\s*(AM|PM|am|pm)?$/i);
+  if (match) {
+    return { val: match[1], ampm: match[2] || "" };
   }
-  return <SunriseIcon className="w-5 h-5 text-white/95 shrink-0" />;
+  return { val: cleaned, ampm: "" };
 };
 
 export default function SunPath({ weather, settings }: SunPathProps) {
@@ -91,26 +78,12 @@ export default function SunPath({ weather, settings }: SunPathProps) {
   // Motion setup for smooth, path-aligned animation
   const motionProgress = useMotionValue(0);
 
-  // HUD dynamic information overlay state
-  const [showHUD, setShowHUD] = React.useState(false);
-  const hudTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 60000);
     return () => {
       clearInterval(interval);
-      if (hudTimeoutRef.current) {
-        clearTimeout(hudTimeoutRef.current);
-      }
     };
   }, []);
-
-  const iconX = useTransform(motionProgress, (v) => 
-    Math.pow(1 - v, 2) * startX + 2 * (1 - v) * v * centerX + Math.pow(v, 2) * endX
-  );
-  const iconY = useTransform(motionProgress, (v) => 
-    Math.pow(1 - v, 2) * horizonY + 2 * (1 - v) * v * daylightControlY + Math.pow(v, 2) * horizonY
-  );
 
   // BUG 1 FIX: Calculate current time in the target location's timezone
   const getNowInLocation = (timezone: string) => {
@@ -159,7 +132,6 @@ export default function SunPath({ weather, settings }: SunPathProps) {
   // Helper to get minutes from H:M format
   const getMinutesFromISO = (iso: string) => {
     if (!iso) return null;
-    // Open-Meteo with timezone=auto returns "YYYY-MM-DDTHH:MM"
     const timePart = iso.split('T')[1] || iso;
     if (!timePart || !timePart.includes(':')) return null;
     const [h, m] = timePart.split(':').map(Number);
@@ -186,8 +158,6 @@ export default function SunPath({ weather, settings }: SunPathProps) {
 
   const sunriseMinutes = getMinutesFromISO(weather?.daily?.sunrise?.[0] || "") || 360;
   const sunsetMinutes = getMinutesFromISO(weather?.daily?.sunset?.[0] || "") || 1080;
-  const moonriseMinutes = getMinutesFromISO(weather?.daily?.moonrise?.[0] || "");
-  const moonsetMinutes = getMinutesFromISO(weather?.daily?.moonset?.[0] || "");
   
   // Determine if it is Day or Night for the cycle
   const isNight = nowMinutes < sunriseMinutes || nowMinutes > sunsetMinutes;
@@ -198,8 +168,6 @@ export default function SunPath({ weather, settings }: SunPathProps) {
   let cycleProgress: number;
   let cycleLabelStart: string;
   let cycleLabelEnd: string;
-  let cycleStartName: string;
-  let cycleEndName: string;
 
   if (!isNight) {
     // Day Cycle: Sunrise to Sunset
@@ -207,8 +175,6 @@ export default function SunPath({ weather, settings }: SunPathProps) {
     activeEndMinutes = sunsetMinutes;
     cycleLabelStart = formatTime(weather?.daily?.sunrise?.[0] || "2026-05-19T06:00");
     cycleLabelEnd = formatTime(weather?.daily?.sunset?.[0] || "2026-05-19T18:00");
-    cycleStartName = "Sunrise";
-    cycleEndName = "Sunset";
   } else {
     // Night Cycle: Night is from Sunset to next Sunrise
     if (nowMinutes >= sunsetMinutes) {
@@ -224,8 +190,6 @@ export default function SunPath({ weather, settings }: SunPathProps) {
       cycleLabelStart = formatTime(weather?.daily?.sunset?.[0] || "2026-05-19T18:00");
       cycleLabelEnd = formatTime(weather?.daily?.sunrise?.[0] || "2026-05-19T06:00");
     }
-    cycleStartName = "Sunset";
-    cycleEndName = "Sunrise";
 
     if (activeStartMinutes > activeEndMinutes) {
       if (nowMinutes >= activeStartMinutes) {
@@ -240,125 +204,9 @@ export default function SunPath({ weather, settings }: SunPathProps) {
   const cycleElapsed = nowMinutes - activeStartMinutes;
   
   cycleProgress = Math.max(0, Math.min(1, cycleElapsed / cycleDuration));
-  const isIconVisible = cycleProgress > 0 && cycleProgress < 1;
-
-  // Calculate crisp and precise Daylight and Nightlight durations
-  const daylightDurationMins = Math.max(0, sunsetMinutes - sunriseMinutes);
-  const daylightHours = Math.floor(daylightDurationMins / 60);
-  const daylightMins = Math.round(daylightDurationMins % 60);
-  const daylightDurationStr = `${daylightHours}h ${daylightMins}m`;
-
-  const tomorrowSunriseMinutes = getMinutesFromISO(weather?.daily?.sunrise?.[1] || "") || sunriseMinutes;
-  const nightDurationMins = Math.max(0, (tomorrowSunriseMinutes + 1440) - sunsetMinutes);
-  const nightHours = Math.floor(nightDurationMins / 60);
-  const nightMins = Math.round(nightDurationMins % 60);
-  const nightDurationStr = `${nightHours}h ${nightMins}m`;
-
-  const [isPressed, setIsPressed] = React.useState(false);
-  const [isHovered, setIsHovered] = React.useState(false);
-
-  // Stats for the live counting capsule
-  const [hudHours, setHudHours] = React.useState(0);
-  const [hudMins, setHudMins] = React.useState(0);
-
-  // Dynamic count-in animation for HUD duration capsule
-  useEffect(() => {
-    if (showHUD) {
-      const targetHours = isNight ? nightHours : daylightHours;
-      const targetMins = isNight ? nightMins : daylightMins;
-
-      // Snappy and direct digit count-in animation
-      const animH = animate(0, targetHours, {
-        duration: 0.5,
-        ease: "easeOut",
-        onUpdate: (latest) => setHudHours(Math.round(latest))
-      });
-
-      const animM = animate(0, targetMins, {
-        duration: 0.65,
-        ease: "easeOut",
-        onUpdate: (latest) => setHudMins(Math.round(latest))
-      });
-
-      return () => {
-        animH.stop();
-        animM.stop();
-      };
-    } else {
-      setHudHours(0);
-      setHudMins(0);
-    }
-  }, [showHUD, isNight, nightHours, daylightHours, nightMins, daylightMins]);
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    
-    // Release pointer capture to prevent pointer lock/stuck-state issues on touch devices
-    try {
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
-    
-    setIsPressed(true);
-    
-    // Trigger medium haptic feedback
-    Haptic.medium(settings.hapticEnabled);
-    
-    // Toggle HUD display and keep it open during hold
-    setShowHUD(true);
-    if (hudTimeoutRef.current) {
-      clearTimeout(hudTimeoutRef.current);
-      hudTimeoutRef.current = null;
-    }
-
-    // Animate path length fully to 1.0 (draw in from wherever it currently is)
-    animate(motionProgress, 1.0, {
-      duration: 0.6,
-      ease: [0.25, 1, 0.5, 1]
-    });
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    if (!isPressed) return;
-    setIsPressed(false);
-    
-    // Trigger subtle release haptic feedback
-    Haptic.light(settings.hapticEnabled);
-
-    // Animate path length back to current cycle progress
-    animate(motionProgress, cycleProgress, {
-      duration: 0.6,
-      ease: [0.25, 1, 0.5, 1]
-    });
-
-    // Dismiss HUD instantly on release
-    setShowHUD(false);
-    if (hudTimeoutRef.current) {
-      clearTimeout(hudTimeoutRef.current);
-      hudTimeoutRef.current = null;
-    }
-  };
-
-  const handlePointerLeave = (e: React.PointerEvent) => {
-    setIsHovered(false);
-    if (isPressed) {
-      handlePointerUp(e);
-    }
-  };
-
-  const handlePointerEnter = () => {
-    setIsHovered(true);
-  };
-
-  const troughHeight = curveHeight * 0.4;
-
-  const daylightArch = `M ${startX} ${horizonY} Q ${centerX} ${daylightControlY} ${endX} ${horizonY}`;
-  const leftTrough = `M 10 ${horizonY + troughHeight} Q 35 ${horizonY + troughHeight} ${startX} ${horizonY}`;
-  const rightTrough = `M ${endX} ${horizonY} Q ${width - 35} ${horizonY + troughHeight} ${width - 10} ${horizonY + troughHeight}`;
 
   useEffect(() => {
     if (isInView) {
-      // Force start at 0 (the sunrise point) so the icon and active path always draw from the start
       motionProgress.set(0);
       const anim = animate(motionProgress, cycleProgress, { 
         duration: 1.8, 
@@ -368,230 +216,154 @@ export default function SunPath({ weather, settings }: SunPathProps) {
     }
   }, [weather, cycleProgress, isInView, motionProgress]);
 
-  const leftX = cycleStartName === "Sunrise" ? -33 : -25;
-  const rightX = cycleEndName === "Sunrise" ? (endX - 22) : (endX - 15);
+  const sunriseSplit = splitTimeAndAmPm(cycleLabelStart);
+  const sunsetSplit = splitTimeAndAmPm(cycleLabelEnd);
+
+  // Perfect circular trajectory parameters designed to start at X=130 and end at X=410 (exactly touching the front hill peaks at Y=115)
+  const theta0 = Math.acos(140 / 180);
+  const iconX = useTransform(motionProgress, (v) => {
+    const angle = -Math.PI + theta0 + v * (Math.PI - 2 * theta0);
+    return 270 + 180 * Math.cos(angle);
+  });
+  const iconY = useTransform(motionProgress, (v) => {
+    const angle = -Math.PI + theta0 + v * (Math.PI - 2 * theta0);
+    return 228.13 + 180 * Math.sin(angle);
+  });
+
+  const getHillColors = (colorTheme: string = 'green', isNight: boolean) => {
+    return {
+      backColor: isNight ? 'rgba(var(--theme-accent-rgb), 0.16)' : 'rgba(var(--theme-accent-rgb), 0.12)',
+      frontColor: isNight ? 'rgba(var(--theme-accent-rgb), 0.22)' : 'rgba(var(--theme-accent-rgb), 0.24)',
+      activeStroke: 'var(--accent-color)',
+      flood: 'var(--accent-color)'
+    };
+  };
+
+  const hillColors = getHillColors(settings.colorTheme, isNight);
+
+  const daylightArch = "M 130 115 A 180 180 0 0 1 410 115";
+  const isIconVisible = cycleProgress > 0 && cycleProgress < 1;
 
   return (
-    <div ref={containerRef} className="w-full px-2 mt-8 mb-4 overflow-hidden relative">
-      {/* Dynamic HUD popup inside the negative space under/around the arc */}
-      <AnimatePresence>
-        {showHUD && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 8, x: "-50%" }}
-            animate={{ opacity: 1, scale: 1, y: 0, x: "-50%" }}
-            exit={{ opacity: 0, scale: 0.9, y: 4, x: "-50%" }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="absolute top-[108px] left-1/2 flex items-center justify-center pointer-events-none select-none z-10 whitespace-nowrap"
-          >
-            <span className="text-[12px] font-medium text-white/50 tracking-[0.08em] uppercase">
-              {isNight ? "Moonlight: " : "Daylight: "}
-              <span className="text-white font-normal lowercase tracking-tight text-[13.5px]">
-                {hudHours}h {hudMins}m
-              </span>
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="flex flex-col px-0 -mx-[21px] md:-mx-[21px]">
+      <div 
+        ref={containerRef} 
+        className="w-full max-w-[335px] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] pt-4 pb-0 px-5 flex flex-col gap-0 overflow-hidden shadow-2xl relative group select-none"
+      >
+        <style>{`
+          .scenery-canvas {
+            position: relative;
+            width: calc(100% + 40px);
+            margin-left: -20px;
+            margin-right: -20px;
+            height: 120px;
+            overflow: hidden;
+            background: transparent;
+            border: none;
+        }
+        .scenery-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            overflow: visible !important;
+        }
+      `}</style>
 
-      <div className="relative w-full h-[150px]">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible translate-x-0">
+      {/* Top Header Row with cohesive Title */}
+      <div className="flex items-center justify-between w-full px-0.5 mb-1">
+        <div className="flex items-center gap-1.5 select-none text-app-text-dim font-medium font-sans">
+          <SunriseIcon className="w-4 h-4 text-app-text-dim" />
+          <span className="text-[11px] uppercase tracking-[0.08em] font-medium text-app-text-dim">
+            <Translate text="Sun & Moon" lang={settings.language || 'en'} />
+          </span>
+        </div>
+        
+        {/* Sunrise & Sunset Times */}
+        <div className="flex items-center gap-3 text-[11px] font-sans font-medium text-app-text/90">
+          <div className="flex items-center gap-1">
+            <SunriseIcon className="w-3.5 h-3.5 text-amber-400/80" />
+            <span>{formatTime(weather?.daily?.sunrise?.[0] || "2026-05-19T06:00")}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <SunsetIcon className="w-3.5 h-3.5 text-orange-400/80" />
+            <span>{formatTime(weather?.daily?.sunset?.[0] || "2026-05-19T18:00")}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Center Row: Boundless scenery SVG */}
+      <div className="scenery-canvas">
+        <svg className="scenery-svg" viewBox="0 0 540 200" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
           <defs>
-            {/* Day Gradient */}
-            <linearGradient id="sunDayGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#9C27B0" /> 
-              <stop offset="15%" stopColor="#FF3D00" />
-              <stop offset="35%" stopColor="#FFD600" />
-              <stop offset="50%" stopColor="#FFFFFF" />
-              <stop offset="65%" stopColor="#FFD600" />
-              <stop offset="85%" stopColor="#FF3D00" />
-              <stop offset="100%" stopColor="#9C27B0" />
+            {/* Sun Arc Glow Matrix */}
+            <linearGradient id="arcGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor={isNight ? "#E0F2FE" : "#FFF5D9"} stopOpacity={isNight ? "0.4" : "0.85"}/>
+              <stop offset="100%" stopColor={isNight ? "#0284C7" : "#FFFFFF"} stopOpacity="0.0"/>
             </linearGradient>
 
-            {/* Moon Gradient */}
-            <linearGradient id="moonNightGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#2D3B4E" /> 
-              <stop offset="25%" stopColor="#B3E5FC" />
-              <stop offset="50%" stopColor="#FFFFFF" />
-              <stop offset="75%" stopColor="#B3E5FC" />
-              <stop offset="100%" stopColor="#2D3B4E" />
+            {/* Hill Gradient Back (Themed) */}
+            <linearGradient id="backHillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor={hillColors.backColor} />
+              <stop offset="100%" stopColor={isNight ? "rgba(var(--theme-accent-rgb), 0.0)" : "rgba(255, 255, 255, 0.0)"} />
             </linearGradient>
 
-            {/* Day Glow Filter (Golden Amber glow, unclipped bounds) */}
-            <filter id="sunGlowFilter" filterUnits="userSpaceOnUse" x="-50" y="-50" width={width + 100} height={height + 100}>
-              <feGaussianBlur stdDeviation="8" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
+            {/* Hill Gradient Front (Themed) */}
+            <linearGradient id="frontHillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor={hillColors.frontColor} />
+              <stop offset="100%" stopColor={isNight ? "rgba(var(--theme-accent-rgb), 0.0)" : "rgba(255, 255, 255, 0.0)"} />
+            </linearGradient>
+
+            {/* Drop shadow casting deep valley depth illusion */}
+            <filter id="layerShadow" x="-10%" y="-10%" width="120%" height="130%">
+              <feDropShadow dx="0" dy="-4" stdDeviation="5" floodColor={isNight ? "#020617" : hillColors.flood} floodOpacity={isNight ? "0.2" : "0.04"}/>
             </filter>
 
-            {/* Moon Glow Filter (Lunar Ice Blue glow, unclipped bounds) */}
-            <filter id="moonGlowFilter" filterUnits="userSpaceOnUse" x="-50" y="-50" width={width + 100} height={height + 100}>
-              <feGaussianBlur stdDeviation="8" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
+            {/* Sun Orb Effects */}
+            <linearGradient id="sunColor" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={isNight ? "#E0F2FE" : "#FFE066"}/>
+              <stop offset="100%" stopColor={isNight ? "#38BDF8" : "#FBBF24"}/>
+            </linearGradient>
+            <filter id="sunGlow" filterUnits="userSpaceOnUse" x="-100" y="-100" width="740" height="400">
+              <feDropShadow dx="0" dy="0" stdDeviation="15" floodColor={isNight ? "#38BDF8" : "#FBBF24"} floodOpacity="0.65"/>
             </filter>
-
-            <clipPath id="horizonClip">
-              <rect x="-50" y="-50" width={width + 100} height={horizonY + 50} />
-            </clipPath>
-
-            <mask id="iconGap" maskUnits="userSpaceOnUse">
-              <rect x="-50" y="-50" width={width + 100} height={height + 100} fill="white" />
-              <motion.circle 
-                cx={iconX}
-                cy={iconY}
-                animate={{ r: (isIconVisible && !isPressed) ? 18 : 0 }}
-                transition={
-                  isPressed 
-                    ? { duration: 0.08 } 
-                    : { duration: 0.15 }
-                }
-                fill="black" 
-              />
-            </mask>
           </defs>
 
-          {/* Horizon Line */}
-          <line 
-            x1="0" y1={horizonY} x2={width} y2={horizonY} 
-            stroke="var(--border-color)" 
-            strokeWidth="1" 
-            opacity="0.5"
+          {/* 1. Arc Light Projection removed */}
+
+          {/* 2. Solid Back Hill: Sharp center peak raised for better visibility (Y=90) */}
+          <path d="M -50 210 L -50 160 C 150 160, 230 90, 270 90 C 310 90, 390 160, 590 160 L 590 210 Z" fill="url(#backHillGrad)" fillOpacity={1} />
+
+          {/* 3a. Precise Circular Arc Line (Faint guide track) */}
+          <path d="M 130 115 A 180 180 0 0 1 410 115" stroke={isNight ? "rgba(56, 189, 248, 0.15)" : "rgba(251, 191, 36, 0.15)"} strokeWidth="1.5" strokeLinecap="round"/>
+
+          {/* 3b. Glowing Active Trajectory Arc portion (progress-driven) */}
+          <motion.path 
+            d="M 130 115 A 180 180 0 0 1 410 115" 
+            stroke={isNight ? "#38BDF8" : "#FBBF24"} 
+            strokeWidth="2.5" 
+            strokeLinecap="round"
+            style={{ pathLength: motionProgress }}
           />
 
-          {/* Troughs */}
-          <path d={leftTrough} fill="none" stroke="var(--border-color)" strokeWidth="4.5" strokeLinecap="round" opacity="0.3" />
-          <path d={rightTrough} fill="none" stroke="var(--border-color)" strokeWidth="4.5" strokeLinecap="round" opacity="0.3" />
+          {/* 4. Sun/Moon Dynamic Node Element (Bound directly via SVG cx/cy parameters for pixel-perfect tracking) */}
+          {isIconVisible && (
+            <motion.circle 
+              cx={iconX} 
+              cy={iconY} 
+              r="11" 
+              fill="url(#sunColor)" 
+              filter="url(#sunGlow)"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.15 }}
+            />
+          )}
 
-          {/* Elements ABOVE horizon */}
-          <g clipPath="url(#horizonClip)">
-            <motion.g
-              className="cursor-pointer"
-              onPointerDown={handlePointerDown}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerLeave}
-              onPointerEnter={handlePointerEnter}
-              onPointerCancel={handlePointerUp}
-              whileHover="hover"
-              whileTap="tap"
-              initial="initial"
-              animate="initial"
-              style={{ touchAction: "none" }}
-            >
-              {/* Thicker, invisible path overlay to dramatically increase hover/tap target area */}
-              <path 
-                d={daylightArch}
-                fill="none" 
-                stroke="transparent" 
-                strokeWidth="24" 
-                className="cursor-pointer"
-              />
-
-              <g mask="url(#iconGap)">
-                {/* Future Path */}
-                <motion.path 
-                  d={daylightArch}
-                  fill="none" 
-                  stroke="white" 
-                  strokeWidth="4" 
-                  strokeLinecap="round"
-                  variants={{
-                    initial: { strokeOpacity: 0.1, strokeWidth: 4 },
-                    hover: { strokeOpacity: 0.22, strokeWidth: 5 },
-                    tap: { strokeOpacity: 0.28, strokeWidth: 5 }
-                  }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
-                />
-
-                {/* Glow Backing Path (Smooth, hardware-accelerated fade-out) */}
-                <motion.path 
-                  d={daylightArch}
-                  fill="none" 
-                  stroke={isNight ? "#B3E5FC" : "#FFD600"} 
-                  strokeWidth="7" 
-                  strokeLinecap="round"
-                  filter={isNight ? "url(#moonGlowFilter)" : "url(#sunGlowFilter)"}
-                  style={{ pathLength: motionProgress }}
-                  animate={{
-                    opacity: isPressed ? 1.0 : (isHovered ? 0.65 : 0),
-                    strokeWidth: isPressed ? 8.5 : (isHovered ? 7.5 : 6)
-                  }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
-                />
-
-                {/* Active Path */}
-                <motion.path 
-                  d={daylightArch}
-                  fill="none" 
-                  stroke={isNight ? "url(#moonNightGradient)" : "url(#sunDayGradient)"} 
-                  strokeWidth="5.5" 
-                  strokeLinecap="round"
-                  style={{ pathLength: motionProgress }}
-                  animate={{
-                    strokeWidth: isPressed ? 7 : (isHovered ? 6.5 : 5.5)
-                  }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
-                />
-              </g>
-            </motion.g>
-
-            {/* Current Cycle Icon */}
-            <motion.g
-              style={{ x: iconX, y: iconY, originX: 0.5, originY: 0.5 }}
-              initial={{ opacity: 0, scale: 0, rotate: -180 }}
-              animate={{
-                opacity: (isInView && isIconVisible && !isPressed) ? 1 : 0,
-                scale: (isInView && isIconVisible && !isPressed) ? 1 : 0,
-                rotate: isPressed ? -180 : 0
-              }}
-              transition={
-                isPressed
-                  ? { duration: 0.08, ease: "easeIn" }
-                  : { duration: 0.15, ease: "easeOut" }
-              }
-            >
-              <foreignObject x="-14" y="-14" width="28" height="28">
-                <div className="flex items-center justify-center w-full h-full">
-                  {isNight ? (
-                    <WeatherIcon 
-                      name="Moon" 
-                      className="w-7 h-7" 
-                      style="coloured"
-                      strokeWidth={1.8}
-                      forceColoured={true}
-                    />
-                  ) : (
-                    <WeatherIcon 
-                      name="Sun" 
-                      forceColoured={true} 
-                      className="w-7 h-7" 
-                      strokeWidth={2}
-                    />
-                  )}
-                </div>
-              </foreignObject>
-            </motion.g>
-          </g>
-
-          {/* Labels */}
-          <foreignObject x={leftX} y={horizonY + 30} width="115" height="24">
-            <div className="flex items-center justify-end gap-1.5 text-app-text font-semibold text-[13px] tracking-tight h-full select-none whitespace-nowrap">
-              {getCycleIcon(cycleStartName)}
-              <span>{cycleLabelStart}</span>
-            </div>
-          </foreignObject>
-
-          <foreignObject x={rightX} y={horizonY + 30} width="115" height="24">
-            <div className="flex items-center justify-start gap-1.5 text-app-text font-semibold text-[13px] tracking-tight h-full select-none whitespace-nowrap">
-              <span>{cycleLabelEnd}</span>
-              {getCycleIcon(cycleEndName)}
-            </div>
-          </foreignObject>
+          {/* 5. Solid Front Hill: Steep U-Shape Valley raised for larger presence (Y=115, Y=175) */}
+          <path d="M -50 210 L -50 150 C 50 150, 110 115, 130 115 C 160 115, 230 175, 270 175 C 310 175, 380 115, 410 115 C 430 115, 490 150, 590 150 L 590 210 Z" fill="url(#frontHillGrad)" fillOpacity={1} filter="url(#layerShadow)" />
         </svg>
       </div>
     </div>
+  </div>
   );
 }

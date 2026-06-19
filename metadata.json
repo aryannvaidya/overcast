@@ -1,5 +1,5 @@
 {
-  "name": "Nimbus Black: Ultra-Minimal Weather",
+  "name": "Overcast",
   "description": "An ultra-minimalist, AMOLED-black weather experience focused on high-precision data visuals and pure typography.",
   "requestFramePermissions": [
     "geolocation"

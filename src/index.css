@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap');
+@import url('https://fonts.cdnfonts.com/css/google-sans');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600&display=swap');
 @import "tailwindcss";
 
 /* ============================================
@@ -69,7 +70,7 @@ body::-webkit-scrollbar,
 }
 
 @theme {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Google Sans", "Product Sans", "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --color-app-bg: var(--bg-primary);
   --color-app-text: var(--text-primary);
   --color-app-text-dim: var(--text-secondary);
@@ -78,11 +79,140 @@ body::-webkit-scrollbar,
 }
 
 :root {
+  --bg-primary: #dbe7df; /* Elegant slightly deeper misty-sage background for beautiful glass pop */
+  --text-primary: #0e1b12; /* Sophisticated deep forest charcoal text */
+  --text-secondary: rgba(14, 27, 18, 0.62); /* Soft forest-slate tracking text */
+  --border-color: rgba(255, 255, 255, 0.48); /* Crisper, high-contrast translucent glass border reflection */
+  --surface-color: rgba(248, 255, 251, 0.48); /* Stunning frosted semi-white mint glassmorphic cards */
+  --popup-bg: #e1ece4; /* Solid elegant greenish-sage tint matching light theme! */
+  --toggle-color: #34c759;
+  --theme-accent-rgb: 22, 101, 52;
+  --text-primary-rgb: 14, 27, 18;
+  --bg-primary-rgb: 219, 231, 223;
+  --shadow-color: rgba(22, 101, 52, 0.03);
+  --accent-color: #166534;
+  color-scheme: light;
+}
+
+[data-color-theme="green"] {
+  --bg-primary: #dbe7df;
+  --text-primary: #0e1b12;
+  --text-secondary: rgba(14, 27, 18, 0.62);
+  --border-color: rgba(255, 255, 255, 0.48);
+  --surface-color: rgba(248, 255, 251, 0.48);
+  --popup-bg: #e1ece4;
+  --toggle-color: #34c759;
+  --theme-accent-rgb: 22, 101, 52;
+  --text-primary-rgb: 14, 27, 18;
+  --bg-primary-rgb: 219, 231, 223;
+  --shadow-color: rgba(22, 101, 52, 0.03);
+  --accent-color: #166534;
+}
+
+[data-color-theme="blue"] {
+  --bg-primary: #dbe4eb;
+  --text-primary: #0e161c;
+  --text-secondary: rgba(14, 22, 28, 0.62);
+  --border-color: rgba(255, 255, 255, 0.48);
+  --surface-color: rgba(248, 252, 255, 0.48);
+  --popup-bg: #e1e9f0;
+  --toggle-color: #007aff;
+  --theme-accent-rgb: 21, 101, 192;
+  --text-primary-rgb: 14, 22, 28;
+  --bg-primary-rgb: 219, 228, 235;
+  --shadow-color: rgba(21, 101, 192, 0.03);
+  --accent-color: #1565c0;
+}
+
+[data-color-theme="pink"] {
   --bg-primary: #000000;
   --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.45);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --surface-color: rgba(255, 255, 255, 0.06);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --surface-color: rgba(255, 255, 255, 0.05);
+  --popup-bg: #121212;
+  --toggle-color: #ffffff;
+  --theme-accent-rgb: 255, 255, 255;
+  --text-primary-rgb: 255, 255, 255;
+  --bg-primary-rgb: 0, 0, 0;
+  --shadow-color: rgba(255, 255, 255, 0.01);
+  --accent-color: #ffffff;
+  color-scheme: dark;
+}
+
+[data-color-theme="purple"] {
+  --bg-primary: #EDE5FA;
+  --text-primary: #2C1C52;
+  --text-secondary: rgba(44, 28, 82, 0.62);
+  --border-color: rgba(255, 255, 255, 0.48);
+  --surface-color: rgba(251, 248, 255, 0.48);
+  --popup-bg: #E3D6F5;
+  --toggle-color: #B19FF1;
+  --theme-accent-rgb: 177, 159, 241;
+  --text-primary-rgb: 44, 28, 82;
+  --bg-primary-rgb: 237, 229, 250;
+  --shadow-color: rgba(177, 159, 241, 0.03);
+  --accent-color: #B19FF1;
+}
+
+[data-color-theme="teal"] {
+  --bg-primary: #f4efe6;
+  --text-primary: #433422;
+  --text-secondary: rgba(67, 52, 34, 0.62);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --surface-color: rgba(255, 255, 255, 0.45);
+  --popup-bg: #eae1d4;
+  --toggle-color: #8c6d48;
+  --theme-accent-rgb: 140, 109, 72;
+  --text-primary-rgb: 67, 52, 34;
+  --bg-primary-rgb: 244, 239, 230;
+  --shadow-color: rgba(140, 109, 72, 0.02);
+  --accent-color: #8c6d48;
+}
+
+[data-color-theme="amber"] {
+  --bg-primary: #eae1d7;
+  --text-primary: #1c150e;
+  --text-secondary: rgba(28, 21, 14, 0.62);
+  --border-color: rgba(255, 255, 255, 0.48);
+  --surface-color: rgba(255, 253, 248, 0.48);
+  --popup-bg: #f0e8de;
+  --toggle-color: #ff9500;
+  --theme-accent-rgb: 230, 81, 0;
+  --text-primary-rgb: 28, 21, 14;
+  --bg-primary-rgb: 234, 225, 215;
+  --shadow-color: rgba(230, 81, 0, 0.03);
+  --accent-color: #ef6c00;
+}
+
+[data-color-theme="monochrome"] {
+  --bg-primary: #F5F5F7;
+  --text-primary: #2d2d2d;
+  --text-secondary: rgba(45, 45, 45, 0.62);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --surface-color: rgba(255, 255, 255, 0.72);
+  --popup-bg: #EBEBEF;
+  --toggle-color: #000000;
+  --theme-accent-rgb: 0, 0, 0;
+  --text-primary-rgb: 45, 45, 45;
+  --bg-primary-rgb: 245, 245, 247;
+  --shadow-color: rgba(0, 0, 0, 0.02);
+  --accent-color: #000000;
+}
+
+[data-color-theme="midnight"] {
+  --bg-primary: #0F1219;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.62);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --surface-color: rgba(255, 255, 255, 0.055);
+  --popup-bg: #1B1E26;
+  --toggle-color: #ffffff;
+  --theme-accent-rgb: 255, 255, 255;
+  --text-primary-rgb: 255, 255, 255;
+  --bg-primary-rgb: 15, 18, 25;
+  --shadow-color: rgba(255, 255, 255, 0.01);
+  --accent-color: #ffffff;
   color-scheme: dark;
 }
 
@@ -92,7 +222,201 @@ body::-webkit-scrollbar,
   --text-secondary: rgba(255, 255, 255, 0.45);
   --border-color: rgba(255, 255, 255, 0.08);
   --surface-color: rgba(255, 255, 255, 0.06);
+  --popup-bg: #0e1611; /* Sleek solid dark forest-charcoal matching dark theme! */
   color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   DYNAMICS OVERRIDES FOR SAGE LIGHT THEME (COMPATIBILITY ENGINE)
+   ========================================================================== */
+
+[data-theme="light"] body {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Force container backgrounds into correct light colors */
+[data-theme="light"] .app-container,
+[data-theme="light"] #root {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Soft sage-green glow shadows for physical cards of the grid */
+[data-theme="light"] .bg-app-surface,
+[data-theme="light"] [class*="bg-app-surface"] {
+  background-color: var(--surface-color) !important;
+  border: 0.5px solid var(--border-color) !important;
+  box-shadow: 0 10px 30px -5px var(--shadow-color), 0 1px 3px rgba(0, 0, 0, 0.01) !important;
+  backdrop-filter: blur(11px) !important;
+  -webkit-backdrop-filter: blur(11px) !important;
+}
+
+/* Dynamically override emerald/green colors in light theme with selected theme color */
+[data-theme="light"] .text-emerald-500,
+[data-theme="light"] .text-emerald-400,
+[data-theme="light"] .text-emerald-600,
+[data-theme="light"] .text-green-500,
+[data-theme="light"] .text-green-400,
+[data-theme="light"] [class*="text-emerald"],
+[data-theme="light"] [class*="text-green-"] {
+  color: var(--accent-color) !important;
+}
+
+[data-theme="light"] .bg-emerald-500,
+[data-theme="light"] .bg-emerald-600,
+[data-theme="light"] .bg-green-500,
+[data-theme="light"] .bg-green-600,
+[data-theme="light"] [class*="bg-emerald"],
+[data-theme="light"] [class*="bg-green-"] {
+  background-color: var(--accent-color) !important;
+}
+
+[data-theme="light"] .shadow-\[0_0_8px_rgba\(16\,185\,129\,0\.6\)\] {
+  box-shadow: 0 0 8px rgba(var(--theme-accent-rgb), 0.6) !important;
+}
+[data-theme="light"] .shadow-\[0_0_8px_rgba\(16\,185\,129\,0\.3\)\] {
+  box-shadow: 0 0 8px rgba(var(--theme-accent-rgb), 0.3) !important;
+}
+
+/* Prevent hard contrast issues with hardcoded tailwind white classes */
+[data-theme="light"] .text-white {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .text-white\/90 { color: rgba(var(--text-primary-rgb), 0.9) !important; }
+[data-theme="light"] .text-white\/80 { color: rgba(var(--text-primary-rgb), 0.8) !important; }
+[data-theme="light"] .text-white\/70 { color: rgba(var(--text-primary-rgb), 0.7) !important; }
+[data-theme="light"] .text-white\/60,
+[data-theme="light"] .text-white\/55,
+[data-theme="light"] .text-white\/50,
+[data-theme="light"] .text-white\/45,
+[data-theme="light"] .text-white\/40,
+[data-theme="light"] .text-white\/30 {
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] .text-white\/20,
+[data-theme="light"] .text-white\/15,
+[data-theme="light"] .text-white\/10 {
+  color: rgba(var(--text-primary-rgb), 0.15) !important;
+}
+
+/* Hardcoded card / section backgrounds to matching high glass opacity values */
+[data-theme="light"] .bg-white\/\[0\.04\] {
+  background-color: var(--surface-color) !important; /* Elegant semi-white frosted glassmorphic cards matching sources page */
+  border: 0.5px solid var(--border-color) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 4px 18px var(--shadow-color) !important;
+}
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(var(--text-primary-rgb), 0.05) !important;
+}
+[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(var(--text-primary-rgb), 0.02) !important;
+}
+
+/* Segmented selector tracks and active keys adjustment */
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white.text-black {
+  background-color: var(--text-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/80 {
+  background-color: rgba(var(--theme-accent-rgb), 0.05) !important;
+  color: rgba(var(--text-primary-rgb), 0.6) !important;
+  border-color: transparent !important;
+}
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/80:hover {
+  background-color: rgba(var(--theme-accent-rgb), 0.08) !important;
+  color: rgba(var(--text-primary-rgb), 0.8) !important;
+}
+
+/* Soften all border dividing lines */
+[data-theme="light"] .divide-white\/\[0\.06\] > * {
+  border-color: rgba(var(--theme-accent-rgb), 0.06) !important;
+}
+[data-theme="light"] .border-white\/\[0\.08\],
+[data-theme="light"] .border-white\/12 {
+  border-color: rgba(var(--theme-accent-rgb), 0.07) !important;
+}
+[data-theme="light"] .border-white\/20,
+[data-theme="light"] .border-white\/\[0\.06\] {
+  border-color: rgba(var(--theme-accent-rgb), 0.06) !important;
+}
+
+/* Beautiful iOS Toggles adaptivity */
+[data-theme="light"] .toggle.bg-white {
+  background-color: var(--toggle-color) !important; /* Dynamic classic action color */
+}
+[data-theme="light"] .toggle.bg-white div {
+  background-color: #ffffff !important;
+}
+[data-theme="light"] .toggle.bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+[data-theme="light"] .toggle.bg-white\/10 div {
+  background-color: #ffffff !important;
+}
+
+/* Overlays & Panels transitions (blur, light background contrast) */
+[data-theme="light"] [class*="panel"],
+[data-theme="light"] [id$="-page"],
+[data-theme="light"] [class$="-page"],
+[data-theme="light"] .settings-panel,
+[data-theme="light"] .add-city-panel {
+  background-color: rgba(var(--bg-primary-rgb), 0.94) !important; /* Perfect match with the primary background */
+  backdrop-filter: blur(48px) !important;
+  -webkit-backdrop-filter: blur(48px) !important;
+}
+[data-theme="light"] .fixed.inset-0.bg-black\/60 {
+  background-color: rgba(var(--bg-primary-rgb), 0.72) !important;
+}
+
+/* Custom map pages, scroll containers adjustments */
+[data-theme="light"] #ambient-background-layers,
+[data-theme="light"] .ambient-glow {
+  opacity: 0.15 !important;
+  filter: saturate(0.5) contrast(0.8) !important;
+}
+
+[data-theme="light"] .map-page {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Softening text links, settings item headers */
+[data-theme="light"] .text-white\/45 {
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] .text-white\/50,
+[data-theme="light"] .text-[#8e8e93] {
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] svg {
+  stroke-opacity: 0.95;
+}
+[data-theme="light"] .stroke-white {
+  stroke: var(--text-primary) !important;
+}
+
+/* Range sliders */
+[data-theme="light"] input[type=range]::-webkit-slider-thumb {
+  background: #ffffff !important;
+  border: 1px solid rgba(var(--theme-accent-rgb), 0.15) !important;
+  box-shadow: 0 4px 10px rgba(var(--theme-accent-rgb), 0.15) !important;
+}
+
+/* Close action icon buttons / navigation rounds */
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(var(--theme-accent-rgb), 0.06) !important;
+}
+[data-theme="light"] .bg-white\/10:hover {
+  background-color: rgba(var(--theme-accent-rgb), 0.1) !important;
+}
+[data-theme="light"] .border-white\/20 {
+  border-color: rgba(var(--theme-accent-rgb), 0.08) !important;
 }
 
 * {
@@ -217,7 +541,6 @@ body {
 
 /* Bottom content — don't hide behind nav bar */
 .bottom-content,
-.hourly-forecast,
 #city-dots,
 .safe-bottom {
   padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
@@ -422,5 +745,53 @@ select,
 
 .reduced-animations [class*="animate"] {
   animation-duration: calc(var(--anim-duration, 3s) * 2) !important;
+}
+
+/* ============================================
+   ALERT CARD BACKDROP BLUR FLASH OPTIMIZATIONS
+   ============================================ */
+.alert-card,
+[class*="alert-card"],
+[class*="warning-card"] {
+  opacity: 0;
+  transform: translateZ(0);
+  will-change: backdrop-filter, opacity;
+  isolation: isolate;
+  background: var(--surface-color) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border-color);
+  transition: opacity 0.15s ease;
+}
+
+.alert-card.blur-ready,
+[class*="alert-card"].blur-ready,
+[class*="warning-card"].blur-ready {
+  opacity: 1;
+}
+
+/* ============================================
+   HUMIDITY CARD WAVE ANIMATIONS
+   ============================================ */
+@keyframes waveMotion1 {
+  0% { transform: translateX(0) translateZ(0); }
+  50% { transform: translateX(-15%) translateZ(0); }
+  100% { transform: translateX(0) translateZ(0); }
+}
+
+@keyframes waveMotion2 {
+  0% { transform: translateX(0) translateZ(0); }
+  50% { transform: translateX(15%) translateZ(0); }
+  100% { transform: translateX(0) translateZ(0); }
+}
+
+.animate-wave1 {
+  animation: waveMotion1 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-wave2 {
+  animation: waveMotion2 5s ease-in-out infinite;
+  will-change: transform;
 }
 

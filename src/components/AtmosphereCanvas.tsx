@@ -5,6 +5,8 @@ interface AtmosphereCanvasProps {
   weatherCode: number;
   isNight: boolean;
   settings: Settings;
+  sunriseISO?: string;
+  sunsetISO?: string;
 }
 
 interface RGB {
@@ -36,9 +38,34 @@ const hexToRgb = (hex: string): RGB => {
 
 
 // Map condition variables to specific 5-stop color palettes
-const getTargetGradientColors = (weatherCode: number, isNight: boolean): RGB[] => {
+const getTargetGradientColors = (weatherCode: number, isNight: boolean, sunriseISO?: string, sunsetISO?: string): RGB[] => {
   let hexes: string[];
-  if (isNight) {
+
+  // Custom Morning/Evening check (strictly 1 hour after sunrise or 1 hour before sunset, and ONLY if clear/mostly clear)
+  let specialAtmosphere: 'none' | 'morning' | 'evening' = 'none';
+  if ((weatherCode === 0 || weatherCode === 1) && sunriseISO && sunsetISO) {
+    try {
+      const nowMs = Date.now();
+      const riseTime = new Date(sunriseISO).getTime();
+      const setTime = new Date(sunsetISO).getTime();
+
+      if (nowMs >= riseTime && nowMs <= riseTime + 1.5 * 60 * 60 * 1000) {
+        specialAtmosphere = 'morning';
+      } else if (nowMs >= setTime - 1.5 * 60 * 60 * 1000 && nowMs <= setTime) {
+        specialAtmosphere = 'evening';
+      }
+    } catch (e) {
+      console.warn("Error parsing sunrise/sunset inside getTargetGradientColors", e);
+    }
+  }
+
+  if (specialAtmosphere === 'morning') {
+    // morning (orange with reddish on bottom)
+    hexes = ["#ff8c00", "#ff5200", "#b22222", "#5c0606", "#000000"];
+  } else if (specialAtmosphere === 'evening') {
+    // evening (mostly reddish and little much violet)
+    hexes = ["#e52d27", "#b31217", "#7a0055", "#3f005c", "#000000"];
+  } else if (isNight) {
     if (weatherCode === 0 || weatherCode === 1) { // Clear
       hexes = ["#0a1122", "#070c18", "#040810", "#020408", "#000000"];
     } else if (weatherCode === 2 || weatherCode === 3) { // Cloudy
@@ -70,7 +97,7 @@ const getTargetGradientColors = (weatherCode: number, isNight: boolean): RGB[] =
   return hexes.map(hexToRgb);
 };
 
-export default function AtmosphereCanvas({ weatherCode, isNight, settings }: AtmosphereCanvasProps) {
+export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunriseISO, sunsetISO }: AtmosphereCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameId = useRef<number | null>(null);
 
@@ -85,12 +112,12 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings }: Atm
 
   useEffect(() => {
     // Prime values
-    const tG = getTargetGradientColors(weatherCode, isNight);
+    const tG = getTargetGradientColors(weatherCode, isNight, sunriseISO, sunsetISO);
     targetColors.current = tG;
     if (currentColors.current.length === 0) {
       currentColors.current = tG.map(c => ({ ...c }));
     }
-  }, [weatherCode, isNight]);
+  }, [weatherCode, isNight, sunriseISO, sunsetISO]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

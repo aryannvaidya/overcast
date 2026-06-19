@@ -1,6 +1,6 @@
 {
-  "name": "Nimbus Black",
-  "short_name": "Nimbus",
+  "name": "OVERCAST",
+  "short_name": "OVERCAST",
   "description": "Ultra-minimal, AMOLED-black weather experience.",
   "start_url": "/",
   "display": "standalone",

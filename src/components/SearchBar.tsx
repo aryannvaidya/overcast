@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Icons } from './WeatherIcons';
-import { searchLocations, reverseGeocode, fetchIPLocation, getCountryCode } from '../services/weatherService';
+import { searchLocations, reverseGeocode } from '../services/weatherService';
 import { Location } from '../types';
+import { Translate, t } from '../lib/translations';
 import debounce from 'lodash.debounce';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn, GLASS_STYLE } from '../lib/utils';
+import { motion } from 'motion/react';
+import { cn } from '../lib/utils';
 import { Haptic } from '../lib/haptics';
 import Fuse from 'fuse.js';
 
@@ -12,14 +13,14 @@ interface SearchBarProps {
   onSelect: (location: Location) => void;
   onClose: () => void;
   hapticEnabled: boolean;
+  lang?: string;
 }
 
-export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBarProps) {
+export default function SearchBar({ onSelect, onClose, hapticEnabled, lang = 'en' }: SearchBarProps) {
   const [query, setQuery] = useState('');
   const [rawResults, setRawResults] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
-  const [isLocationDenied, setIsLocationDenied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -27,23 +28,6 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
     if (inputRef.current) {
       inputRef.current.focus();
     }
-  }, []);
-
-  useEffect(() => {
-    const checkPermission = async () => {
-      try {
-        if (navigator.permissions) {
-          const result = await navigator.permissions.query({ name: "geolocation" as PermissionName });
-          setIsLocationDenied(result.state === 'denied');
-          result.onchange = () => {
-            setIsLocationDenied(result.state === 'denied');
-          };
-        }
-      } catch (e) {
-        console.warn("Error checking geolocation permission in SearchBar:", e);
-      }
-    };
-    checkPermission();
   }, []);
 
   // Fuse instance for client-side fuzzy refinement
@@ -87,40 +71,21 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
   }, [query]);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 30, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 30, scale: 0.98 }}
-      transition={{ 
-        duration: 0.5, 
-        ease: [0.22, 1, 0.36, 1],
-        opacity: { duration: 0.3 }
-      }}
-      className="fixed inset-0 z-[99995] bg-app-bg/90 backdrop-blur-2xl flex flex-col pt-[calc(env(safe-area-inset-top)+24px)]"
-      data-no-swipe
-    >
+    <>
       <div className="max-w-[390px] mx-auto w-full px-4 sm:px-6 flex flex-col h-full">
-        <header className="flex items-center gap-3 sm:gap-4 mb-8">
+        <header className="flex items-center w-full mb-6">
           <div className={cn(
-            "flex-1 min-w-0 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 bg-app-text/10 border border-app-border rounded-2xl transition-all duration-300",
-            "focus-within:bg-app-text/15 focus-within:ring-1 focus-within:ring-app-text/20"
+            "w-full flex items-center h-[56px] px-4.5 bg-app-surface border border-app-border rounded-full transition-all duration-300 backdrop-blur-md shadow-[0_8px_30px_rgba(22,101,52,0.04)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.25)]",
+            "focus-within:bg-app-surface/90 focus-within:ring-1 focus-within:ring-app-text/10"
           )}>
-            {isLoading ? (
-              <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full flex-shrink-0" 
-              />
-            ) : (
-              <Icons.Search className="w-5 h-5 text-app-text-dim/40 flex-shrink-0" />
-            )}
+            <Icons.Search className="w-[20px] h-[20px] text-app-text-dim/80 flex-shrink-0 mr-3 stroke-[2.2]" />
             <input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search city..."
-              className="bg-transparent border-none outline-none flex-1 min-w-0 text-app-text placeholder:text-app-text-dim/60 text-[17px]"
+              placeholder={t("Search for a city or location", lang)}
+              className="bg-transparent border-none outline-none flex-1 min-w-0 text-app-text placeholder:text-app-text-dim/60 text-[16px] font-normal"
             />
             {query && (
               <button 
@@ -129,37 +94,49 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
                   setQuery(''); 
                   setRawResults([]); 
                 }} 
-                className="text-app-text-dim/40 hover:text-app-text flex-shrink-0"
+                className="text-app-text-dim/50 hover:text-app-text flex-shrink-0 mr-2 p-1 rounded-full hover:bg-app-text/5 transition-colors"
+                title="Clear"
               >
-                <Icons.X className="w-5 h-5 bg-app-text/10 rounded-full p-1" />
+                <Icons.X className="w-3.5 h-3.5" />
               </button>
             )}
+            
+            {/* Sleek separator line exactly copying the mockup */}
+            <div className="h-6 w-[1px] bg-neutral-600 flex-shrink-0 mx-2" />
+            
+            {/* Cancel icon replacing the microphone slot */}
+            <button 
+              onClick={() => {
+                Haptic.medium(hapticEnabled);
+                onClose();
+              }}
+              className="p-1.5 text-app-text-dim/70 hover:text-app-text transition-all rounded-full hover:bg-app-text/5 flex-shrink-0 active:scale-95"
+              title="Cancel"
+              aria-label="Cancel"
+            >
+              <Icons.X className="w-[20px] h-[20px] stroke-[2]" />
+            </button>
           </div>
-          <button 
-            onClick={() => {
-              Haptic.light(hapticEnabled);
-              onClose();
-            }}
-            className="text-[17px] font-medium text-app-text-dim hover:text-app-text transition-colors flex-shrink-0 whitespace-nowrap"
-          >
-            Cancel
-          </button>
         </header>
 
         <div className="flex-1 overflow-y-auto no-scrollbar pb-12">
-          {isLocationDenied && (
+          {geoError && (
             <motion.div 
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-4 bg-white/[0.04] border border-white/[0.08] rounded-2xl mb-6 flex gap-3 items-start select-none"
+              className="w-full flex items-center h-[56px] px-4 bg-app-surface border border-red-500/20 rounded-full mb-6 text-[14px] text-red-500 dark:text-red-400 font-medium shadow-[0_4px_20px_rgba(239,68,68,0.03)]"
             >
-              <span className="text-[18px]">📍</span>
-              <div className="flex flex-col">
-                <p className="text-[13px] font-semibold text-white tracking-tight">Location access off</p>
-                <p className="text-[12px] text-white/45 leading-relaxed mt-0.5">
-                  Turn on location in browser settings to get local weather
-                </p>
-              </div>
+              <Icons.ShieldAlert className="w-[20px] h-[20px] text-red-500 flex-shrink-0 mr-3 stroke-[2.2]" />
+              <span className="flex-1 truncate">
+                <Translate text="Location access is denied" lang={lang} />
+              </span>
+              <button 
+                onClick={() => setGeoError(null)}
+                className="p-1 text-red-500/50 hover:text-red-500 transition-colors rounded-full hover:bg-red-500/5 ml-2"
+                title="Dismiss"
+              >
+                <Icons.X className="w-3.5 h-3.5" />
+              </button>
             </motion.div>
           )}
 
@@ -174,19 +151,21 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
                   y: { repeat: Infinity, duration: 1.5, ease: "easeInOut" },
                   rotate: { repeat: Infinity, duration: 1, ease: "linear" }
                 }}
-                className="w-8 h-8 border-2 border-white/10 border-t-white rounded-full" 
+                className="w-8 h-8 border-2 border-black/15 border-t-black rounded-full" 
               />
               <motion.p 
                 animate={{ opacity: [0.4, 0.8, 0.4] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
                 className="text-[13px] font-medium text-app-text-dim/40 uppercase tracking-widest"
               >
-                Searching
+                <Translate text="Searching..." lang={lang} />
               </motion.p>
             </div>
           ) : results.length > 0 ? (
             <div className="flex flex-col gap-2">
-              <h3 className="text-[11px] font-semibold text-app-text-dim/40 uppercase tracking-[0.1em] px-2 mb-2">Search Results</h3>
+              <h3 className="text-[11px] font-semibold text-app-text-dim/40 uppercase tracking-[0.1em] px-2 mb-2">
+                <Translate text="Search Results" lang={lang} />
+              </h3>
               {results.map((loc) => (
                 <button
                   key={loc.id}
@@ -209,7 +188,9 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
                   </div>
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[16px] font-medium text-app-text truncate">{loc.name}</span>
+                      <span className="text-[16px] font-medium text-app-text truncate">
+                        <Translate text={loc.name} lang={lang} />
+                      </span>
                       {loc.type && (
                         <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-app-text/10 text-app-text-dim/60 rounded-[4px]">
                           {loc.type}
@@ -227,82 +208,48 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
           ) : query.length >= 2 ? (
             <div className="py-20 text-center opacity-40">
               <Icons.Search className="w-12 h-12 mx-auto mb-4 opacity-10" />
-              <p className="text-[15px] text-app-text">No results found for "{query}"</p>
+              <p className="text-[15px] text-app-text">
+                <Translate text="No results found for" lang={lang} /> "{query}"
+              </p>
             </div>
           ) : (
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-2">
-                <h3 className="text-[11px] font-semibold text-app-text-dim/40 uppercase tracking-[0.1em] px-2 mb-2">Nearby</h3>
-                
-                {geoError && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl mb-2"
-                  >
-                    <div className="flex gap-3">
-                      <Icons.ShieldAlert className="w-5 h-5 text-red-500 flex-shrink-0" />
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[13px] font-bold text-red-500 uppercase tracking-wider">Location Error</p>
-                        <p className="text-[12px] text-app-text-dim leading-relaxed">
-                          {geoError.includes('denied') 
-                            ? "Location access is blocked. Please enable GPS/Location in your device settings and allow the browser to see your location."
-                            : geoError}
-                        </p>
-                        <button 
-                          onClick={() => setGeoError(null)}
-                          className="text-[11px] font-black text-app-text uppercase tracking-widest mt-2 hover:opacity-70 transition-all text-left"
-                        >
-                          Try Again
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
+                <h3 className="text-[11px] font-semibold text-app-text-dim/40 uppercase tracking-[0.1em] px-2 mb-2">
+                  <Translate text="Nearby" lang={lang} />
+                </h3>
 
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     Haptic.medium(hapticEnabled);
                     setGeoError(null);
                     setIsLoading(true);
 
-                    const runIpFallback = async () => {
-                      console.log("[SearchBarGeolocate] Falling back to IP Geolocation...");
+                    // 1. Check if permission has already been explicitly denied
+                    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
                       try {
-                        const ipLoc = await fetchIPLocation();
-                        if (ipLoc) {
-                          const curLoc: Location = {
-                            id: Math.floor(Date.now() / 1000),
-                            name: ipLoc.cityName,
-                            latitude: ipLoc.lat,
-                            longitude: ipLoc.lon,
-                            country: ipLoc.country,
-                            timezone: ipLoc.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-                          };
-                          Haptic.success(hapticEnabled);
-                          onSelect(curLoc);
-                          return true;
+                        const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+                        if (result.state === 'denied') {
+                          setGeoError("Location access is denied");
+                          setIsLoading(false);
+                          return;
                         }
                       } catch (err) {
-                        console.error("[SearchBarGeolocate] IP geolocator failed:", err);
+                        console.warn("Permissions query failed in SearchBar:", err);
                       }
-                      return false;
-                    };
+                    }
 
                     if (navigator.geolocation) {
                       let resolvedOrFailed = false;
 
-                      // Backup timer: if GPS takes > 3.5 seconds, fallback instantly to IP Geolocation!
-                      const gpsTimerToken = setTimeout(async () => {
+                      // Backup timer: if GPS takes > 5.5 seconds, timeout and report error
+                      const gpsTimerToken = setTimeout(() => {
                         if (!resolvedOrFailed) {
                           resolvedOrFailed = true;
-                          const ok = await runIpFallback();
                           setIsLoading(false);
-                          if (!ok) {
-                            setGeoError("Location request timed out. Please check your connection.");
-                          }
+                          setGeoError("Location access is denied");
                         }
-                      }, 3500);
+                      }, 5500);
 
                       navigator.geolocation.getCurrentPosition(
                         async (pos) => {
@@ -315,36 +262,30 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
                             const lon = pos.coords.longitude;
                             
                             // Try to get a real city name
-                            const resolvedLocation = await reverseGeocode(lat, lon);
+                            const resolvedLocation = await reverseGeocode(lat, lon, lang);
                             
                             const curLoc: Location = {
-                              id: resolvedLocation?.name ? Math.floor(Date.now() / 1000) : 0, 
+                              id: Math.floor(Date.now() / 1000), 
                               name: resolvedLocation?.name || "Current Location",
                               latitude: lat,
                               longitude: lon,
                               country: resolvedLocation?.country || "Nearby",
                               admin1: resolvedLocation?.admin1,
-                              admin2: resolvedLocation?.admin2,
-                              timezone: resolvedLocation?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-                              type: resolvedLocation?.type,
-                              featureCode: resolvedLocation?.featureCode
+                              timezone: resolvedLocation?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
                             };
                             
                             Haptic.success(hapticEnabled);
                             onSelect(curLoc);
                           } catch (err) {
                             console.error("Reverse geocoding error:", err);
-                            const ok = await runIpFallback();
-                            if (!ok) {
-                              onSelect({
-                                id: 0,
-                                name: "Current Location",
-                                latitude: pos.coords.latitude,
-                                longitude: pos.coords.longitude,
-                                country: "Nearby",
-                                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-                              });
-                            }
+                            onSelect({
+                              id: Math.floor(Date.now() / 1000),
+                              name: "Current Location",
+                              latitude: pos.coords.latitude,
+                              longitude: pos.coords.longitude,
+                              country: "Nearby",
+                              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+                            });
                           } finally {
                             setIsLoading(false);
                           }
@@ -355,29 +296,14 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
                           clearTimeout(gpsTimerToken);
                           
                           console.warn("GPS error encountered in search page:", err.message);
-                          const ok = await runIpFallback();
                           setIsLoading(false);
-                          if (!ok) {
-                            if (err.code === err.PERMISSION_DENIED) {
-                              setGeoError("Permission denied. We need your permission to fetch weather for your exact location.");
-                            } else if (err.code === err.POSITION_UNAVAILABLE) {
-                              setGeoError("Location signals unavailable. Ensure GPS is enabled or try using a high-precision location service.");
-                            } else if (err.code === err.TIMEOUT) {
-                              setGeoError("Location request timed out. Please check your connection.");
-                            } else {
-                              setGeoError("An unknown location error occurred.");
-                            }
-                          }
+                          setGeoError("Location access is denied");
                         },
                         { timeout: 8000, enableHighAccuracy: true }
                       );
                     } else {
-                      runIpFallback().then(ok => {
-                        setIsLoading(false);
-                        if (!ok) {
-                          setGeoError("Geolocation is not supported by your browser.");
-                        }
-                      });
+                      setIsLoading(false);
+                      setGeoError("Location access is denied");
                     }
                   }}
                   className="w-full flex items-center gap-4 p-4 text-left active:bg-app-text/5 bg-app-surface border border-app-border rounded-2xl transition-all"
@@ -386,8 +312,12 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
                     <Icons.Navigation className="w-5 h-5 text-blue-500" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[16px] font-medium text-app-text">Current Location</span>
-                    <span className="text-[13px] text-app-text-dim/60">Use your device's GPS</span>
+                    <span className="text-[16px] font-medium text-app-text">
+                      <Translate text="Current Location" lang={lang} />
+                    </span>
+                    <span className="text-[13px] text-app-text-dim/60">
+                      <Translate text="Use your device's GPS" lang={lang} />
+                    </span>
                   </div>
                   <Icons.ChevronRight className="w-5 h-5 text-app-text-dim/20 ml-auto" />
                 </button>
@@ -395,12 +325,14 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled }: SearchBa
 
               <div className="py-10 text-center opacity-20">
                 <Icons.MapPin className="w-16 h-16 mx-auto mb-6 opacity-10" />
-                <p className="text-[11px] font-bold tracking-[0.2em] uppercase text-app-text">Global Database</p>
+                <p className="text-[11px] font-bold tracking-[0.2em] uppercase text-app-text">
+                  <Translate text="Global Database" lang={lang} />
+                </p>
               </div>
             </div>
           )}
         </div>
       </div>
-    </motion.div>
+    </>
   );
 }
