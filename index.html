@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      document.documentElement.setAttribute('data-theme', 'light');
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="transparent">
@@ -8,10 +11,10 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Nimbus Black">
-    <meta name="application-name" content="Nimbus Black">
+    <meta name="apple-mobile-web-app-title" content="OVERCAST">
+    <meta name="application-name" content="OVERCAST">
     <link rel="manifest" href="/manifest.json">
-    <title>Nimbus Black</title>
+    <title>OVERCAST</title>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
@@ -24,6 +27,19 @@
     </script>
   </head>
   <body>
+    <!-- Pre-warm backdrop-filter GPU pipeline to prevent transparent visual flashes on load -->
+    <div id="blur-prewarm" style="
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      backdrop-filter: blur(1px);
+      -webkit-backdrop-filter: blur(1px);
+      transform: translateZ(0);
+      pointer-events: none;
+      opacity: 0;
+    " aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

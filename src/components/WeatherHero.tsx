@@ -1,14 +1,15 @@
 import React from 'react';
+import { Moon } from 'lucide-react';
 import { WeatherData, Location, Settings } from '../types';
 import { WeatherIcon, Icons } from './WeatherIcons';
-import { getCurrentWeatherState, getMoonPhaseInfo } from '../services/weatherService';
+import { getCurrentWeatherState, getMoonPhaseInfo, getWeatherThemeColor } from '../services/weatherService';
 import { formatTemp } from '../lib/units';
 import { motion } from 'motion/react';
 import { format, parseISO } from 'date-fns';
 import { RawIcons } from './WeatherIcons';
 import { cn } from '../lib/utils';
 import { Haptic } from '../lib/haptics';
-import { t, translateWmoCode } from '../lib/translations';
+import { t, translateWmoCode, Translate } from '../lib/translations';
 
 interface WeatherHeroProps {
   weather: WeatherData;
@@ -17,9 +18,20 @@ interface WeatherHeroProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   slideDirection?: 'left' | 'right' | null;
+  onOpenSettings?: () => void;
+  onOpenCityManager?: () => void;
 }
 
-export default function WeatherHero({ weather, location, settings, onRefresh, isRefreshing, slideDirection }: WeatherHeroProps) {
+export default function WeatherHero({ 
+  weather, 
+  location, 
+  settings, 
+  onRefresh, 
+  isRefreshing, 
+  slideDirection,
+  onOpenSettings,
+  onOpenCityManager
+}: WeatherHeroProps) {
   if (!weather || !weather.current) return null;
   const info = getCurrentWeatherState(weather);
   const moonPhase = getMoonPhaseInfo(weather.daily.moonPhase?.[0] ?? 0);
@@ -40,7 +52,7 @@ export default function WeatherHero({ weather, location, settings, onRefresh, is
 
   const formatLastUpdated = (ts: number) => {
     const minutes = Math.floor((Date.now() - ts) / 60000);
-    if (minutes < 1) return 'NOW';
+    if (minutes < 1) return 'Now';
     if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h`;
@@ -49,10 +61,89 @@ export default function WeatherHero({ weather, location, settings, onRefresh, is
 
   const slideTransition = {
     type: "spring",
-    stiffness: 140,
-    damping: 18,
-    mass: 1
+    stiffness: 260,
+    damping: 24,
+    mass: 0.5
   };
+
+  const theme = getWeatherThemeColor(info.weatherCode, info.isDay);
+
+  if (settings.layoutWeatherDetail === 'compact') {
+    return (
+      <div className="flex flex-col w-full py-4 mb-0 font-sans select-none overflow-hidden relative">
+        {/* Top Header Row within the Hero Card */}
+        <div className="flex items-center justify-between w-full mb-20 relative z-40">
+          {/* Location Trigger */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              Haptic.medium(settings.hapticEnabled);
+              onOpenCityManager?.();
+            }}
+            className="flex items-center gap-1.5 focus:outline-none cursor-pointer group active:scale-[0.97] transition-all duration-150 relative z-50 pointer-events-auto"
+            style={{ touchAction: 'manipulation' }}
+          >
+            {location?.isCurrentLocation && (
+              <Icons.MapPin className="w-5 h-5 text-app-text shrink-0" strokeWidth={2.5} />
+            )}
+            <span className="text-[16px] font-black text-app-text group-hover:text-app-text/80 transition-colors tracking-tight">
+              <Translate text={location.name} lang={settings.language || 'en'} />
+            </span>
+            <Icons.ChevronDown className="w-4 h-4 text-app-text/60 group-hover:text-app-text transition-colors shrink-0" strokeWidth={2.5} />
+          </button>
+
+          {/* Settings Trigger */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              Haptic.medium(settings.hapticEnabled);
+              onOpenSettings?.();
+            }}
+            className="w-11 h-11 relative z-50 pointer-events-auto bg-app-surface border border-app-border flex items-center justify-center rounded-full active:scale-[0.95] hover:bg-app-surface/80 hover:border-app-border/80 transition-all select-none cursor-pointer"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <Icons.Settings2 className="w-5 h-5 text-app-text" strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Temperature, Icon, and Feels Like Side-by-Side Row */}
+        <div className="flex flex-col items-start gap-1 mb-1.5 relative z-10 w-full">
+          <div className="flex items-end justify-start gap-5">
+            <div className="flex items-baseline relative">
+              <span className="text-[92px] leading-none font-[200] tracking-tighter text-app-text">
+                {formatTemp(weather.current.temperature, settings.unitTemp)}
+              </span>
+              <span className="text-5xl font-[300] text-app-text leading-none select-none -translate-y-6">°</span>
+            </div>
+
+            <div className="flex items-center justify-center pb-2.5">
+              <WeatherIcon 
+                name={info.icon as any} 
+                style={settings.iconStyle}
+                className="w-[58px] h-[58px] text-app-text main-weather-svg-icon" 
+                strokeWidth={1.5} 
+              />
+            </div>
+          </div>
+
+          {/* Feels like detail just below the current temp */}
+          <div className="text-[14px] font-black text-app-text select-none mt-0.5 uppercase tracking-[0.08em] flex items-center gap-1.5">
+            <span><Translate text="Feels like" lang={settings.language || 'en'} />:</span>
+            <span>{formatTemp(weather.current.apparentTemperature, settings.unitTemp)}°</span>
+          </div>
+        </div>
+
+        {/* High/Low temperatures styled as Max/Min */}
+        <div className="flex flex-col items-start gap-1 relative z-10">
+          <div className="flex items-center gap-2.5 text-[13px] font-black uppercase tracking-[0.08em] text-app-text-dim">
+            <span><Translate text="Max" lang={settings.language || 'en'} />: {formatTemp(weather.daily.temperatureMax?.[0] ?? 0, settings.unitTemp)}°</span>
+            <span className="w-1.5 h-1.5 bg-app-text-dim/25 rounded-full" />
+            <span><Translate text="Min" lang={settings.language || 'en'} />: {formatTemp(weather.daily.temperatureMin?.[0] ?? 0, settings.unitTemp)}°</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center text-center pt-1 pb-6 overflow-visible">
@@ -64,8 +155,9 @@ export default function WeatherHero({ weather, location, settings, onRefresh, is
         className="flex items-center gap-2 mb-4"
       >
         <div className="flex items-center gap-2 bg-app-surface py-1.5 px-3 rounded-full border border-app-border">
+          <Moon className="w-3 h-3 text-app-text-dim/80 shrink-0" strokeWidth={1.5} />
           <span className="text-[10px] uppercase font-bold tracking-widest text-app-text-dim whitespace-nowrap">
-            {moonPhase.emoji} {moonPhase.label} • {moonPhase.illumination}%
+            <Translate text={moonPhase.label} lang={settings.language || 'en'} /> • {moonPhase.illumination}%
           </span>
         </div>
 
@@ -83,14 +175,14 @@ export default function WeatherHero({ weather, location, settings, onRefresh, is
               >
                 <Icons.Clock className={cn("w-3 h-3 text-app-text-dim/70", isRefreshing && "animate-pulse")} />
                 <span className="text-[10px] uppercase font-bold tracking-widest">
-                  {formatLastUpdated(weather.fetchedAt)}
+                  <Translate text={formatLastUpdated(weather.fetchedAt)} lang={settings.language || 'en'} />
                 </span>
               </motion.button>
             ) : (
               <div className="flex items-center gap-2 bg-app-surface py-1.5 px-3 rounded-full border border-app-border select-none">
                 <Icons.Clock className="w-3 h-3 text-app-text-dim/60" />
                 <span className="text-[10px] uppercase font-bold tracking-widest text-app-text-dim/60">
-                  {formatLastUpdated(weather.fetchedAt)}
+                  <Translate text={formatLastUpdated(weather.fetchedAt)} lang={settings.language || 'en'} />
                 </span>
               </div>
             )}
@@ -111,7 +203,7 @@ export default function WeatherHero({ weather, location, settings, onRefresh, is
           <WeatherIcon 
             name={info.icon as any} 
             style={settings.iconStyle}
-            className="w-32 h-32 text-app-text main-weather-svg-icon" 
+            className="w-[120px] h-[120px] text-app-text main-weather-svg-icon" 
             strokeWidth={1.2} 
           />
         </motion.div>
@@ -122,10 +214,10 @@ export default function WeatherHero({ weather, location, settings, onRefresh, is
           transition={slideTransition}
           className="relative flex justify-center -mr-6"
         >
-          <span className="text-[140px] leading-none font-[200] tracking-tighter text-app-text">
+          <span className="text-[140px] leading-none font-[100] tracking-tighter text-app-text">
             {formatTemp(weather.current.temperature, settings.unitTemp)}
           </span>
-          <span className="text-3xl font-light text-app-text-dim mt-6 ml-2">°</span>
+          <span className="text-6xl font-[400] text-app-text mt-4 ml-1">°</span>
         </motion.div>
 
         <motion.div 

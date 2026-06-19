@@ -12,6 +12,7 @@ export interface Location {
   isGeolocated?: boolean;
   isCurrentLocation?: boolean;
   icon?: string;
+  localizedName?: { [lang: string]: string };
 }
 
 export interface WeatherData {
@@ -85,8 +86,9 @@ export interface Settings {
   unitPressure: 'mmHg' | 'hPa' | 'inHg' | 'mbar';
   unitVisibility: 'km' | 'miles';
   unitPrecipitation: 'mm' | 'inches';
-  iconStyle: 'outline' | 'coloured';
-  theme: 'black';
+  iconStyle: 'outline' | 'animated_outline' | 'static' | 'animated';
+  theme: 'black' | 'light';
+  colorTheme?: 'green' | 'blue' | 'pink' | 'purple' | 'teal' | 'amber' | 'monochrome' | 'midnight';
   hapticEnabled: boolean;
   notificationTime: string; // HH:mm
   rainThreshold: number; // probability percentage
@@ -104,6 +106,9 @@ export interface Settings {
   oneSignalPlayerId?: string;
   backgroundGlow?: 'on' | 'off' | 'static';
   language?: string; // e.g. 'en', 'es', 'de', etc.
+  layoutWeatherDetail?: 'compact' | 'detailed';
+  layoutHourlyForecast?: 'compact' | 'detailed';
+  layoutDailyForecast?: 'compact' | 'detailed';
   enabledTiles?: {
     aqi: boolean;
     uv: boolean;
@@ -116,7 +121,10 @@ export interface Settings {
     aqiGraph?: boolean;
     aqiPollutant?: boolean;
     uvGraph?: boolean;
+    pollen?: boolean;
+    rainGraph?: boolean;
   };
+  tileOrder?: string[];
 }
 
 export interface WeatherState {

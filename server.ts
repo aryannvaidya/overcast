@@ -3,12 +3,35 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dns from 'node:dns';
+import fs from 'node:fs';
 
 // Force DNS result order to prioritize IPv4 over IPv6
 dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 const PORT = 3000;
+
+// SERVER-SIDE TRANSLATION CACHE & STORAGE
+const CACHE_FILE = path.join(process.cwd(), 'translation-cache.json');
+let serverTranslationCache: Record<string, Record<string, string>> = {};
+
+try {
+  if (fs.existsSync(CACHE_FILE)) {
+    const rawData = fs.readFileSync(CACHE_FILE, 'utf-8');
+    serverTranslationCache = JSON.parse(rawData);
+    console.log(`[Translation Cache] Loaded cached translations for ${Object.keys(serverTranslationCache).length} languages from ${CACHE_FILE}`);
+  }
+} catch (err) {
+  console.warn('[Translation Cache] Failed to load cache file, starting with empty fresh cache:', err);
+}
+
+function saveTranslationCacheToFile() {
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(serverTranslationCache, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[Translation Cache] Failed to serialize translation cache to file:', err);
+  }
+}
 
 // Initialize GoogleGenAI client (server-side only, secure, telemetry header included)
 const apiKey = process.env.GEMINI_API_KEY;
@@ -291,6 +314,355 @@ function generateHourlyFromDailyAndCurrent(data: any) {
   return data;
 }
 
+// In-memory rate limiting map for user ratings (limit to 3 ratings per IP per 1 minute window)
+const ratingRateLimiter = new Map<string, { count: number; lastRequest: number }>();
+
+// --- API WEATHER RATING SUBMISSION ENDPOINT WITH DISCORD WEBHOOK SUPPORT ---
+app.post('/api/rate', async (req, res) => {
+  const clientIP = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown');
+  const now = Date.now();
+  const limitWindow = 60 * 1000; // 1 minute
+  const maxRequestsPerWindow = 3;
+
+  const currentLimit = ratingRateLimiter.get(clientIP);
+  if (currentLimit) {
+    if (now - currentLimit.lastRequest < limitWindow) {
+      if (currentLimit.count >= maxRequestsPerWindow) {
+        return res.status(429).json({ success: false, error: "Too many requests. Please try again later." });
+      }
+      currentLimit.count += 1;
+    } else {
+      currentLimit.count = 1;
+      currentLimit.lastRequest = now;
+    }
+  } else {
+    ratingRateLimiter.set(clientIP, { count: 1, lastRequest: now });
+  }
+
+  const {
+    rating,
+    condition,
+    temp,
+    feelsLike,
+    humidity,
+    windSpeed,
+    pressure,
+    uvIndex,
+    aqi,
+    location,
+    appVersion,
+    theme,
+    timestamp,
+    deviceMetadata
+  } = req.body;
+
+  // Validate rating (must be an integer 1-5 range)
+  const ratingNum = parseInt(rating, 10);
+  if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+    return res.status(400).json({ success: false, error: "Invalid rating value. Must be between 1 and 5." });
+  }
+
+  // Safe truncation and HTML tag cleansing
+  const cleanString = (val: any, maxLen = 100) => {
+    if (val === undefined || val === null) return 'N/A';
+    return String(val).trim().replace(/<[^>]*>/g, '').slice(0, maxLen);
+  };
+
+  const cleanNum = (val: any) => {
+    if (val === undefined || val === null || val === '') return 'N/A';
+    const num = parseFloat(val);
+    return isNaN(num) ? 'N/A' : num;
+  };
+
+  const cleanCondition = cleanString(condition, 50);
+  const cleanTemp = cleanNum(temp);
+  const cleanFeelsLike = cleanNum(feelsLike);
+  const cleanHumidity = cleanNum(humidity);
+  const cleanWindSpeed = cleanString(windSpeed, 30);
+  const cleanPressure = cleanNum(pressure);
+  const cleanUvIndex = cleanNum(uvIndex);
+  const cleanAqi = cleanNum(aqi);
+  const cleanLocation = cleanString(location, 100);
+  const cleanAppVersion = cleanString(appVersion, 20);
+  const cleanTheme = cleanString(theme, 30);
+  const cleanTimestamp = cleanString(timestamp, 50);
+  const cleanDeviceMetadata = cleanString(deviceMetadata, 250);
+
+  const starsStr = '⭐'.repeat(ratingNum) + '☆'.repeat(5 - ratingNum);
+  
+  // Decide decimal color for Discord embed
+  let embedColor = 1409085; // Default dark green (5 stars)
+  if (ratingNum === 4) embedColor = 10741301; // Lime
+  else if (ratingNum === 3) embedColor = 15381256; // Yellow
+  else if (ratingNum === 2) embedColor = 16487000; // Orange
+  else if (ratingNum === 1) embedColor = 16007006; // Rose/Red
+
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) {
+    console.warn("[Backend Rating] Discord Webhook URL is missing from environment variables. Local simulation logged.");
+    return res.json({ success: true, message: "Feedback success (Webhook simulated)" });
+  }
+
+  const discordPayload = {
+    embeds: [
+      {
+        title: "📲 New Weather Rating Submission",
+        color: embedColor,
+        description: `**OVERCAST User Feedback**\nRating: **${ratingNum}/5** (${starsStr})`,
+        fields: [
+          {
+            name: "🌡️ Weather Information",
+            value: `• **Location**: ${cleanLocation}\n• **Condition**: ${cleanCondition}\n• **Temperature**: ${cleanTemp}°\n• **Feels Like**: ${cleanFeelsLike}°`,
+            inline: true
+          },
+          {
+            name: "📊 Climate Metrics",
+            value: `• **Humidity**: ${cleanHumidity}%\n• **Wind Speed**: ${cleanWindSpeed}\n• **Pressure**: ${cleanPressure} hPa\n• **UV Index**: ${cleanUvIndex}\n• **AQI**: ${cleanAqi}`,
+            inline: true
+          },
+          {
+            name: "ℹ️ App Context",
+            value: `• **App Version**: \`${cleanAppVersion}\`\n• **Theme**: \`${cleanTheme}\`\n• **Timestamp**: ${cleanTimestamp}`,
+            inline: false
+          },
+          {
+            name: "💻 Device & Browser Info",
+            value: `\`\`\`\n${cleanDeviceMetadata}\n\`\`\``,
+            inline: false
+          }
+        ],
+        footer: {
+          text: "OVERCAST Weather Engine Feedback Stream"
+        },
+        timestamp: new Date().toISOString()
+      }
+    ]
+  };
+
+  try {
+    const response = await fetchWithTimeout(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(discordPayload)
+    }, 4000);
+    
+    if (!response.ok) {
+      console.error(`[Backend Rating] Discord Webhook fetch returned status ${response.status}`);
+      return res.status(500).json({ success: false, error: "Unable to process feedback at this time" });
+    }
+    
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[Backend Rating] Error dispatching rating to Discord webhook:", err);
+    return res.status(500).json({ success: false, error: "Unable to process feedback at this time" });
+  }
+});
+
+// --- API TRANSLATION ENDPOINT USING GEMINI WITH SERVER-SIDE CACHING & RESILIENT FALLBACKS ---
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLanguage } = req.body;
+  if (!text || !targetLanguage) {
+    return res.status(400).json({ error: "Missing text or targetLanguage" });
+  }
+
+  const langCode = String(targetLanguage).toLowerCase().slice(0, 2);
+  if (langCode === 'en' || !text) {
+    return res.json({ translated: text });
+  }
+
+  if (!serverTranslationCache[langCode]) {
+    serverTranslationCache[langCode] = {};
+  }
+  const cacheForLang = serverTranslationCache[langCode];
+
+  // If Gemini client is not initialized, return original text but utilize any existing server-side cache
+  const aiClientAvailable = !!ai;
+
+  const isArray = Array.isArray(text);
+  const isObject = typeof text === 'object' && text !== null && !isArray;
+
+  // Case 1: SINGLE STRING TRANSLATION
+  if (!isArray && !isObject) {
+    const singleText = String(text);
+    if (!singleText.trim()) {
+      return res.json({ translated: singleText });
+    }
+
+    if (cacheForLang[singleText] !== undefined) {
+      return res.json({ translated: cacheForLang[singleText] });
+    }
+
+    if (!aiClientAvailable) {
+      return res.json({ translated: singleText });
+    }
+
+    try {
+      const geminiRes = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Translate this entire text into the target language with code "${langCode}". Maintain formatting, spacing, paragraphs, and markdown tags (like headings, bullet lists, etc.). Treat any line breaks as single logical lines as presented in the source text. Keep all templates/variables like {temp}, {speed}, etc. intact. Your output must contain the translated text only with no conversational greeting or markdown block wrappers.
+Text:
+${singleText}`,
+        config: {
+          systemInstruction: 'You are a professional, high-fidelity translator for a weather application named OVERCAST. Translate the text accurately. Do not add any explanations or conversational preambles.',
+          responseMimeType: "text/plain"
+        }
+      });
+
+      const translatedResult = geminiRes.text?.trim() || singleText;
+      cacheForLang[singleText] = translatedResult;
+      saveTranslationCacheToFile();
+
+      return res.json({ translated: translatedResult });
+    } catch (error: any) {
+      // Quiet, resilient fallback to English/cached text on translation rate-limit/errors
+      return res.json({ translated: singleText, error: true });
+    }
+  }
+
+  // Case 2: ARRAY OF STRINGS TRANSLATION
+  if (isArray) {
+    const origArray = text as string[];
+    const uniqueTexts = Array.from(new Set(origArray.map(t => String(t || ""))));
+    const localMap: Record<string, string> = { "": "" };
+    const missingTexts: string[] = [];
+
+    for (const val of uniqueTexts) {
+      if (!val) continue;
+      if (cacheForLang[val] !== undefined) {
+        localMap[val] = cacheForLang[val];
+      } else {
+        missingTexts.push(val);
+      }
+    }
+
+    if (missingTexts.length === 0) {
+      const translatedArray = origArray.map(t => localMap[t] !== undefined ? localMap[t] : t);
+      return res.json({ translated: translatedArray });
+    }
+
+    if (!aiClientAvailable) {
+      const translatedArray = origArray.map(t => localMap[t] !== undefined ? localMap[t] : t);
+      return res.json({ translated: translatedArray });
+    }
+
+    try {
+      const geminiRes = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Translate the following list of strings into the target language with code "${langCode}". Return the translations as a JSON array in the exact same index order.
+List: ${JSON.stringify(missingTexts)}`,
+        config: {
+          systemInstruction: 'You are a professional, high-fidelity translator for a weather application named OVERCAST. Translate JSON elements accurately. Return only a flat JSON array of strings.',
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        }
+      });
+
+      const resultText = geminiRes.text;
+      if (resultText) {
+        const parsedArray = JSON.parse(resultText.trim());
+        if (Array.isArray(parsedArray)) {
+          missingTexts.forEach((orig, idx) => {
+            const trans = parsedArray[idx] || orig;
+            cacheForLang[orig] = trans;
+            localMap[orig] = trans;
+          });
+          saveTranslationCacheToFile();
+        }
+      }
+
+      const translatedArray = origArray.map(t => localMap[t] !== undefined ? localMap[t] : t);
+      return res.json({ translated: translatedArray });
+    } catch (error: any) {
+      // Quiet, resilient fallback to English/cached text on translation rate-limit/errors
+      const translatedArray = origArray.map(t => localMap[t] !== undefined ? localMap[t] : t);
+      return res.json({ translated: translatedArray, error: true });
+    }
+  }
+
+  // Case 3: DICTIONARY / OBJECT TRANSLATION
+  if (isObject) {
+    const origObj = text as Record<string, string>;
+    const uniqueValues = Array.from(new Set(Object.values(origObj).map(t => String(t || ""))));
+    const valueMap: Record<string, string> = { "": "" };
+    const missingValues: string[] = [];
+
+    for (const val of uniqueValues) {
+      if (!val) continue;
+      if (cacheForLang[val] !== undefined) {
+        valueMap[val] = cacheForLang[val];
+      } else {
+        missingValues.push(val);
+      }
+    }
+
+    if (missingValues.length === 0) {
+      const translatedObj: Record<string, string> = {};
+      for (const [key, val] of Object.entries(origObj)) {
+        translatedObj[key] = valueMap[val] !== undefined ? valueMap[val] : val;
+      }
+      return res.json({ translated: translatedObj });
+    }
+
+    if (!aiClientAvailable) {
+      const translatedObj: Record<string, string> = {};
+      for (const [key, val] of Object.entries(origObj)) {
+        translatedObj[key] = valueMap[val] !== undefined ? valueMap[val] : val;
+      }
+      return res.json({ translated: translatedObj });
+    }
+
+    try {
+      const geminiRes = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Translate the following list of strings into the target language with code "${langCode}". Return the translations as a JSON array in the exact same index order.
+List: ${JSON.stringify(missingValues)}`,
+        config: {
+          systemInstruction: 'You are a professional, high-fidelity translator for a weather application named OVERCAST. Translate JSON elements accurately. Return only a flat JSON array of strings.',
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        }
+      });
+
+      const resultText = geminiRes.text;
+      if (resultText) {
+        const parsedArray = JSON.parse(resultText.trim());
+        if (Array.isArray(parsedArray)) {
+          missingValues.forEach((orig, idx) => {
+            const trans = parsedArray[idx] || orig;
+            cacheForLang[orig] = trans;
+            valueMap[orig] = trans;
+          });
+          saveTranslationCacheToFile();
+        }
+      }
+
+      const translatedObj: Record<string, string> = {};
+      for (const [key, val] of Object.entries(origObj)) {
+        translatedObj[key] = valueMap[val] !== undefined ? valueMap[val] : val;
+      }
+      return res.json({ translated: translatedObj });
+    } catch (error: any) {
+      // Quiet, resilient fallback to English/cached text on translation rate-limit/errors
+      const translatedObj: Record<string, string> = {};
+      for (const [key, val] of Object.entries(origObj)) {
+        translatedObj[key] = valueMap[val] !== undefined ? valueMap[val] : val;
+      }
+      return res.json({ translated: translatedObj, error: true });
+    }
+  }
+
+  // Final catch-all fallback
+  return res.json({ translated: text });
+});
+
 // --- API WEATHER PROXY WITH RESILIENT GEMINI FALLBACK ---
 app.get('/api/weather-proxy', async (req, res) => {
   const url = req.url || '';
@@ -459,7 +831,7 @@ Return structure:
       };
 
       const geminiRes = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: groundingPrompt,
         config: {
           tools: [{ googleSearch: {} }],
@@ -585,7 +957,7 @@ Return up to 5 matching result records in the exact JSON schema provided.`;
       };
 
       const geminiRes = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],
@@ -703,7 +1075,7 @@ Strictly return your response as a valid JSON object matching this schema.`;
       };
 
       const geminiRes = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],

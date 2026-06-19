@@ -52,7 +52,7 @@ const safeFetch = async (url: string) => {
     }
     console.warn(`[Direct] Failed with status ${response?.status} for ${url}`);
   } catch (err) {
-    console.error("[Direct] Failed completely for", url, err);
+    console.warn("[Direct] Failed completely; continuing with proxy fallback pipeline for:", url, err);
   }
 
   // 1b. Try apex domain fallback client-side if subdomain resolves/connects poorly
@@ -117,7 +117,7 @@ const safeFetch = async (url: string) => {
         }
       }
     } catch (e) {
-      console.error("[Direct-HTTP Fallback] Failed for", httpUrl, e);
+      console.warn("[Direct-HTTP Fallback] Failed for", httpUrl, e);
     }
   }
 
@@ -272,13 +272,16 @@ export const parseCurrentWeather = (res: any): any => {
     : (h?.visibility?.[idx] !== undefined ? (h.visibility[idx] / 1000).toFixed(1) : "10.0");
   const uvIndex = h?.uv_index?.[idx] ?? 0;
 
+  const rawWindSpeed = c.wind_speed_10m ?? c.windspeed_10m ?? c.wind_speed ?? c.windspeed ?? h?.wind_speed_10m?.[idx] ?? h?.windspeed_10m?.[idx] ?? 0;
+  const rawWindDir = c.wind_direction_10m ?? c.winddirection_10m ?? c.wind_direction ?? c.winddirection ?? h?.wind_direction_10m?.[idx] ?? h?.winddirection_10m?.[idx] ?? 0;
+
   const data = {
     temp:        Math.round(c.temperature_2m),
     feelsLike:   Math.round(c.apparent_temperature),
     humidity:    c.relative_humidity_2m,
     weatherCode: c.weather_code,
-    windSpeed:   Math.round(c.wind_speed_10m),
-    windDir:     c.wind_direction_10m,
+    windSpeed:   Math.round(Number(rawWindSpeed) || 0),
+    windDir:     Number(rawWindDir) || 0,
     precipProb:  precipProb,
     visibility:  visibility,
     uvIndex:     uvIndex,
@@ -386,7 +389,7 @@ export const parseHourlyForecast = (res: any): any[] => {
       precip: Math.round(precip),
       code,
       isNight,
-      icon:   getHourlyIcon(precip, isNight),
+      icon:   getHourlyIcon(precip, isNight, code),
     });
   }
 
@@ -992,11 +995,12 @@ export async function fetchIPLocation(): Promise<{ lat: number; lon: number; cit
   return null;
 }
 
-export async function reverseGeocode(lat: number, lon: number): Promise<Partial<Location> | null> {
+export async function reverseGeocode(lat: number, lon: number, langCode?: string): Promise<Partial<Location> | null> {
+  const langKey = (langCode || 'en').toLowerCase().slice(0, 2);
   // 1. Primary: Photon by Komoot (Un-rate-limited, open, built on OpenStreetMap, extremely fast & robust)
   try {
-    console.log('[PhotonGeocoding] Running Photon Reverse Geocoding');
-    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`;
+    console.log('[PhotonGeocoding] Running Photon Reverse Geocoding with lang:', langKey);
+    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}${langKey !== 'en' ? `&lang=${langKey}` : ''}`;
     const response = await fetchWithTimeout(url, {}, 4000, 0);
     if (response.ok) {
       const data = await response.json();
@@ -1019,8 +1023,8 @@ export async function reverseGeocode(lat: number, lon: number): Promise<Partial<
 
   // 2. Secondary: BigDataCloud Reverse Geocode Client API (free, fast, keyless)
   try {
-    console.log('[BackupGeocoding] Running BigDataCloud Reverse Geocoding');
-    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+    console.log('[BackupGeocoding] Running BigDataCloud Reverse Geocoding with lang:', langKey);
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=${langKey}`;
     const response = await fetchWithTimeout(url, {}, 4000, 0);
     if (response.ok) {
       const item = await response.json();
@@ -1095,33 +1099,21 @@ export async function reverseGeocode(lat: number, lon: number): Promise<Partial<
 // --- Air Quality API ---
 
 export const getAQIStandard = (cityName: string, countryCode: string): 'IN' | 'US' => {
-  const indianCities = [
-    "delhi", "mumbai", "bangalore", "chennai",
-    "kolkata", "hyderabad", "pune", "ahmedabad",
-    "jaipur", "lucknow", "kanpur", "nagpur",
-    "godda", "jharkhand", "ranchi", "patna"
-  ];
-
-  const name = cityName.toLowerCase();
-  const isIndian = indianCities.some(c => 
-    name.includes(c)
-  ) || countryCode === "IN";
-
-  return isIndian ? "IN" : "US";
+  return "US";
 };
 
 export const getAQICategory = (aqi: number, standard = "US") => {
   if (standard === "IN") {
     if (aqi <= 50)  return { label:"Good",        color:"#00b050", recommendation: "Ideal for outdoor activities." };
     if (aqi <= 100) return { label:"Satisfactory", color:"#92d050", recommendation: "Acceptable air quality for general public." };
-    if (aqi <= 200) return { label:"Moderate",     color:"#ffff00", recommendation: "May cause breathing discomfort to people with sensitive lungs." };
+    if (aqi <= 200) return { label:"Moderate",     color:"#FED60A", recommendation: "May cause breathing discomfort to people with sensitive lungs." };
     if (aqi <= 300) return { label:"Poor",         color:"#ff7e00", recommendation: "May cause breathing discomfort on prolonged exposure." };
     if (aqi <= 400) return { label:"Very Poor",    color:"#ff0000", recommendation: "May cause respiratory illness on prolonged exposure." };
     return              { label:"Severe",          color:"#7e0023", recommendation: "May cause respiratory effects even on healthy people." };
   } else {
     if (aqi <= 50)  return { label:"Good",                      color:"#00e400", recommendation: "Ideal for outdoor activities." };
-    if (aqi <= 100) return { label:"Moderate",                  color:"#ffff00", recommendation: "Acceptable quality; sensitive groups should limit exertion." };
-    if (aqi <= 150) return { label:"Unhealthy for Sensitive",   color:"#ff7e00", recommendation: "Sensitive groups should reduce prolonged outdoor activity." };
+    if (aqi <= 100) return { label:"Moderate",                  color:"#FED60A", recommendation: "Acceptable quality; sensitive groups should limit exertion." };
+    if (aqi <= 150) return { label:"Unhealthy for Sensitive Groups",   color:"#ff7e00", recommendation: "Sensitive groups should reduce prolonged outdoor activity." };
     if (aqi <= 200) return { label:"Unhealthy",                 color:"#ff0000", recommendation: "Everyone should reduce prolonged outdoor exertion." };
     if (aqi <= 300) return { label:"Very Unhealthy",            color:"#8f3f97", recommendation: "Avoid outdoor activity. Keep windows closed." };
     return              { label:"Hazardous",                    color:"#7e0023", recommendation: "Stay indoors. Health emergency conditions." };
@@ -1480,7 +1472,7 @@ export async function fetchOpenMeteoAQI(lat: number, lon: number, cityName?: str
 export function getWeatherInfo(code: number, isDay: boolean = true) {
   const mappings: Record<number, { label: string; icon: string }> = {
     0: { label: "Clear sky", icon: isDay ? "Sun" : "Moon" },
-    1: { label: "Mainly clear", icon: isDay ? "CloudSun" : "CloudMoon" },
+    1: { label: "Mainly clear", icon: isDay ? "Sun" : "Moon" },
     2: { label: "Partly cloudy", icon: isDay ? "CloudSun" : "CloudMoon" },
     3: { label: "Overcast", icon: "Cloud" },
     45: { label: "Fog", icon: "CloudFog" },
@@ -1506,14 +1498,14 @@ export function getWeatherInfo(code: number, isDay: boolean = true) {
     86: { label: "Snow showers (Heavy)", icon: "Snowflake" },
     95: { label: "Thunderstorm (Slight)", icon: "CloudLightning" },
     96: { label: "Thunderstorm (Moderate)", icon: "CloudLightning" },
-    99: { label: "Thunderstorm (Heavy with hail)", icon: "Zap" },
+    99: { label: "Thunderstorm (Heavy with hail)", icon: "CloudLightning" },
   };
 
   if (mappings[code] !== undefined) {
     return mappings[code];
   }
 
-  if (code >= 96) return { label: 'Thunderstorm (Heavy with hail)', icon: 'Zap' };
+  if (code >= 96) return { label: 'Thunderstorm (Heavy with hail)', icon: 'CloudLightning' };
   if (code === 95) return { label: 'Thunderstorm', icon: 'CloudLightning' };
   if (code >= 85) return { label: 'Snow Showers', icon: 'CloudSnow' };
   if (code >= 80) return { label: 'Rain Showers', icon: 'CloudRainWind' };
@@ -1617,7 +1609,11 @@ export const getMoonPhaseInfo = (_phase?: number) => {
   return { label, illumination, icon, emoji, phase };
 };
 
-export const getHourlyIcon = (precipProb: number, isNight: boolean) => {
+export const getHourlyIcon = (precipProb: number, isNight: boolean, code?: number) => {
+  if (code !== undefined) {
+    const info = getWeatherInfo(code, !isNight);
+    return { label: info.label, icon: info.icon };
+  }
   if (precipProb >= 70) return { label: 'Heavy Storm', icon: 'CloudLightning' };
   if (precipProb >= 50) return { label: 'Rain', icon: 'CloudRain' };
   if (precipProb >= 30) return { label: 'Light Rain', icon: 'CloudDrizzle' };
@@ -2023,5 +2019,20 @@ export function getPrefetchUrls(lat: number, lon: number, cityName: string): str
 
   return [forecastUrl, openMeteoAqiUrl, waqiGeoUrl, waqiSlugUrl];
 }
+
+export function getWeatherThemeColor(code: number, isDay: boolean = true) {
+  if (code >= 95) return { color: "#ff9500", glow: "rgba(255, 149, 0, 0.15)", border: "rgba(255, 149, 0, 0.3)" }; // Thunderstorm (Orange Offer)
+  if (code >= 80) return { color: "#3b82f6", glow: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.3)" }; // Rain showers (Blue)
+  if (code >= 71) return { color: "#38bdf8", glow: "rgba(56, 189, 248, 0.15)", border: "rgba(56, 189, 248, 0.3)" }; // Snow (Sky blue)
+  if (code >= 61) return { color: "#3b82f6", glow: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.3)" }; // Rain
+  if (code >= 51) return { color: "#06b6d4", glow: "rgba(6, 182, 212, 0.15)", border: "rgba(6, 182, 212, 0.3)" }; // Drizzle
+  if (code >= 45) return { color: "#94a3b8", glow: "rgba(148, 163, 184, 0.12)", border: "rgba(148, 163, 184, 0.25)" }; // Foggy (Slate/Gray)
+  if (code === 3) return { color: "#94a3b8", glow: "rgba(148, 163, 184, 0.12)", border: "rgba(148, 163, 184, 0.25)" }; // Overcast (Slate)
+  if (code === 2) return isDay ? { color: "#f59e0b", glow: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)" } : { color: "#7dd3fc", glow: "rgba(125, 211, 252, 0.15)", border: "rgba(125, 211, 252, 0.3)" }; // Partly cloudy
+  if (code === 1) return isDay ? { color: "#eab308", glow: "rgba(234, 179, 8, 0.15)", border: "rgba(234, 179, 8, 0.3)" } : { color: "#93c5fd", glow: "rgba(147, 197, 253, 0.15)", border: "rgba(147, 197, 253, 0.3)" }; // Mainly clear
+  if (code === 0) return isDay ? { color: "#f59e0b", glow: "rgba(245, 158, 11, 0.18)", border: "rgba(245, 158, 11, 0.35)" } : { color: "#93c5fd", glow: "rgba(147, 197, 253, 0.18)", border: "rgba(147, 197, 253, 0.35)" }; // Clear Sky
+  return { color: "#ffffff", glow: "rgba(255, 255, 255, 0.08)", border: "rgba(255, 255, 255, 0.12)" };
+}
+
 
 

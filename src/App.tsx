@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { formatTemp } from './lib/units';
 import { Location, WeatherData, WeatherState, Settings } from './types';
-import { fetchWeather, fetchWeatherBulk, getMoonPhaseInfo, getCurrentHourIndex, reverseGeocode, getCurrentWeatherState, getAQIDataWithFallback, getDataAgeHours, getAQIFromCacheOrLive, fetchIPLocation, getPrefetchUrls } from './services/weatherService';
+import { fetchWeather, fetchWeatherBulk, getMoonPhaseInfo, getCurrentHourIndex, reverseGeocode, getCurrentWeatherState, getAQIDataWithFallback, getDataAgeHours, getAQIFromCacheOrLive, fetchIPLocation, getPrefetchUrls, getWeatherThemeColor } from './services/weatherService';
 import { getCachedWeatherData, saveWeatherData, STORAGE_KEYS, getCityKey, CACHE_EXPIRY } from './lib/storage';
 import { initGestures } from './lib/gestures';
 import WeatherSkeleton from './components/WeatherSkeleton';
@@ -9,17 +9,19 @@ import SearchBar from './components/SearchBar';
 import WeatherHero from './components/WeatherHero';
 import { HourlyForecast, DailyForecast } from './components/Forecasts';
 import WeatherDetails from './components/WeatherDetails';
+import { UpcomingRainGraph } from './components/UpcomingRainGraph';
 import SunPath from './components/SunPath';
 import { Icons } from './components/WeatherIcons';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { cn } from './lib/utils';
-import SettingsScreen from './components/SettingsScreen';
+import SettingsScreen, { TERMS_CONTENT, PRIVACY_CONTENT } from './components/SettingsScreen';
 import CityManager from './components/CityManager';
 import WeatherRadarMap from './components/WeatherRadarMap';
 import AlertsDisplay from './components/AlertsDisplay';
 import AtmosphereCanvas from './components/AtmosphereCanvas';
 import { Haptic } from './lib/haptics';
 import { format } from 'date-fns';
+import { Translate, fetchDynamicTranslation } from './lib/translations';
 import { 
   NotifSettings, 
   scheduleMorningSummary, 
@@ -27,7 +29,8 @@ import {
   checkWeatherAlerts, 
   applyNotifToggleStates,
   SafeNotif,
-  safeOneSignal
+  safeOneSignal,
+  tagDeviceLocation
 } from './services/oneSignalService';
 
 const DEFAULT_LOCATION: Location | null = null;
@@ -38,8 +41,8 @@ const INITIAL_SETTINGS: Settings = {
   unitPressure: 'mmHg',
   unitVisibility: 'km',
   unitPrecipitation: 'mm',
-  iconStyle: 'coloured',
-  theme: 'black',
+  iconStyle: 'animated_outline',
+  theme: 'light',
   hapticEnabled: true,
   notificationTime: '08:00',
   rainThreshold: 30,
@@ -55,6 +58,9 @@ const INITIAL_SETTINGS: Settings = {
   alertMorningSummary: false,
   alertNightSummary: false,
   backgroundGlow: 'on',
+  layoutWeatherDetail: 'detailed',
+  layoutHourlyForecast: 'detailed',
+  layoutDailyForecast: 'detailed',
   enabledTiles: {
     aqi: true,
     uv: true,
@@ -66,8 +72,19 @@ const INITIAL_SETTINGS: Settings = {
     sunMoon: true,
     aqiGraph: true,
     aqiPollutant: true,
-    uvGraph: true
-  }
+    uvGraph: true,
+    rainGraph: true
+  },
+  tileOrder: [
+    'rainGraph',
+    'forecast',
+    'aqi',
+    'uv',
+    'sunMoon',
+    'humidityVisibility',
+    'precipitationWind',
+    'pollen'
+  ]
 };
 
 const LocationState = {
@@ -239,7 +256,7 @@ if (typeof window !== 'undefined') {
     if (reduce) {
       document.body.classList.add("reduced-animations");
     }
-  });
+  }).catch(() => {});
 }
 
 const showCitySkeleton = () => {
@@ -340,12 +357,16 @@ export default function App() {
       const s = localStorage.getItem('app_settings');
       if (s) {
         const parsed = JSON.parse(s);
-        // Migration: Ensure theme is black
-        parsed.theme = 'black';
+        // Migration: Force light theme only
+        parsed.theme = 'light';
         if (!parsed.unitPrecipitation) parsed.unitPrecipitation = 'mm';
         if (parsed.iconStyle === '3d') parsed.iconStyle = 'outline';
+        if (parsed.iconStyle === 'coloured') parsed.iconStyle = 'animated_outline';
         if (parsed.alertRain === undefined) parsed.alertRain = true;
         if (parsed.backgroundGlow === undefined) parsed.backgroundGlow = 'on';
+        if (parsed.layoutWeatherDetail === undefined) parsed.layoutWeatherDetail = 'detailed';
+        if (parsed.layoutHourlyForecast === undefined) parsed.layoutHourlyForecast = 'detailed';
+        if (parsed.layoutDailyForecast === undefined) parsed.layoutDailyForecast = 'detailed';
         if (!parsed.enabledTiles) {
           parsed.enabledTiles = {
             aqi: true,
@@ -358,7 +379,8 @@ export default function App() {
             sunMoon: true,
             aqiGraph: true,
             aqiPollutant: true,
-            uvGraph: true
+            uvGraph: true,
+            rainGraph: true
           };
         } else {
           if (parsed.enabledTiles.forecast === undefined) parsed.enabledTiles.forecast = true;
@@ -366,6 +388,19 @@ export default function App() {
           if (parsed.enabledTiles.aqiGraph === undefined) parsed.enabledTiles.aqiGraph = true;
           if (parsed.enabledTiles.aqiPollutant === undefined) parsed.enabledTiles.aqiPollutant = true;
           if (parsed.enabledTiles.uvGraph === undefined) parsed.enabledTiles.uvGraph = true;
+          if (parsed.enabledTiles.rainGraph === undefined) parsed.enabledTiles.rainGraph = true;
+        }
+        if (!parsed.tileOrder) {
+          parsed.tileOrder = [
+            'rainGraph',
+            'forecast',
+            'aqi',
+            'uv',
+            'sunMoon',
+            'humidityVisibility',
+            'precipitationWind',
+            'pollen'
+          ];
         }
         cachedSettings = parsed;
       }
@@ -396,10 +431,25 @@ export default function App() {
       };
     }
 
-    let initialLocations: Location[] = (cachedLocations || []).filter((loc: Location) => !loc.isCurrentLocation);
+    const initialLocations: Location[] = [];
+    const seen = new Set<string>();
+    
     if (currentLoc) {
-      initialLocations.unshift(currentLoc);
+      initialLocations.push(currentLoc);
+      seen.add(`${currentLoc.latitude.toFixed(2)}-${currentLoc.longitude.toFixed(2)}`);
+      seen.add(currentLoc.name.toLowerCase());
     }
+    
+    (cachedLocations || []).forEach((loc: Location) => {
+      if (loc.isCurrentLocation) return;
+      const coordKey = `${loc.latitude.toFixed(2)}-${loc.longitude.toFixed(2)}`;
+      const nameKey = loc.name.toLowerCase();
+      if (!seen.has(coordKey) && !seen.has(nameKey)) {
+        initialLocations.push(loc);
+        seen.add(coordKey);
+        seen.add(nameKey);
+      }
+    });
 
     // Do not add any default city - let the user decide.
 
@@ -813,7 +863,13 @@ export default function App() {
     };
 
     setState(prev => {
-      const filtered = prev.locations.filter(loc => !loc.isCurrentLocation);
+      const filtered = prev.locations.filter(loc => {
+        if (loc.isCurrentLocation) return false;
+        const sameCoords = Math.abs(loc.latitude - lat) < 0.01 && 
+                           Math.abs(loc.longitude - lon) < 0.01;
+        const sameName = loc.name.toLowerCase() === cityName.toLowerCase();
+        return !(sameCoords || sameName);
+      });
       const newLocations = [newLocation, ...filtered];
       return {
         ...prev,
@@ -850,6 +906,7 @@ export default function App() {
 
     hideLocationIndicator();
     console.log("Current location page added:", cityName);
+    tagDeviceLocation(cityName, lat, lon);
   };
 
   const addCurrentLocationPageFromCache = () => {
@@ -867,7 +924,13 @@ export default function App() {
     };
 
     setState(prev => {
-      const filtered = prev.locations.filter(loc => !loc.isCurrentLocation);
+      const filtered = prev.locations.filter(loc => {
+        if (loc.isCurrentLocation) return false;
+        const sameCoords = Math.abs(loc.latitude - cachedLoc.latitude) < 0.01 && 
+                           Math.abs(loc.longitude - cachedLoc.longitude) < 0.01;
+        const sameName = loc.name.toLowerCase() === cachedLoc.name.toLowerCase();
+        return !(sameCoords || sameName);
+      });
       const newLocations = [cachedLoc, ...filtered];
       return {
         ...prev,
@@ -898,12 +961,14 @@ export default function App() {
       saveWeatherData(getCityKey(updatedLocation), data);
       
       setState(prev => {
-        const newLocs = [...prev.locations];
-        if (newLocs[0]?.isCurrentLocation) {
-          newLocs[0] = updatedLocation;
-        } else {
-          newLocs.unshift(updatedLocation);
-        }
+        const filtered = prev.locations.filter((loc, idx) => {
+          if (idx === 0) return false;
+          const sameCoords = Math.abs(loc.latitude - lat) < 0.01 && 
+                             Math.abs(loc.longitude - lon) < 0.01;
+          const sameName = loc.name.toLowerCase() === cityName.toLowerCase();
+          return !(sameCoords || sameName);
+        });
+        const newLocs = [updatedLocation, ...filtered];
         return {
           ...prev,
           locations: newLocs,
@@ -912,6 +977,7 @@ export default function App() {
       });
       
       console.log("Current location replaced successfully:", cityName);
+      tagDeviceLocation(cityName, lat, lon);
       return true;
     } catch (err) {
       console.warn("fetchWeather failed when replacing current location page, keeping previous city:", err);
@@ -959,7 +1025,26 @@ export default function App() {
 
     LocationState.isLoading = true;
 
-    // We will try GPS, but if it fails, is denied, or takes too long, we will use IP-based geolocation!
+    // Check if permission is already explicitly denied
+    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        if (result.state === 'denied') {
+          console.warn("[fetchCurrentLocation] Geolocation permission is denied. Not adding any city.");
+          LocationState.isLoading = false;
+          hideLocationIndicator();
+          hideMinimalIndicator();
+          if (!isBackground) {
+            setLocationPermissionError(true);
+          }
+          return null;
+        }
+      } catch (err) {
+        console.warn("Permissions API check failed:", err);
+      }
+    }
+
+    // We will try GPS, but if it fails, is denied, or takes too long, we will use IP-based geolocation ONLY if GPS is not disabled/denied!
     const runIpFallback = async () => {
       console.log("[fetchCurrentLocation] Running IP Location Fallback...");
       try {
@@ -1042,10 +1127,14 @@ export default function App() {
           resolvedOrFailed = true;
           clearTimeout(gpsTimeoutToken);
 
+          if (!isBackground) {
+            setLocationPermissionError(false);
+          }
+
           const { latitude, longitude } = pos.coords;
           const moved = hasLocationChanged(latitude, longitude);
 
-          const resolved = await reverseGeocode(latitude, longitude);
+          const resolved = await reverseGeocode(latitude, longitude, stateRef.current.settings.language);
           let cityName = resolved?.name;
           if (!cityName || cityName === "Current Location") {
             cityName = getTimezoneCity();
@@ -1101,9 +1190,34 @@ export default function App() {
           resolvedOrFailed = true;
           clearTimeout(gpsTimeoutToken);
           
-          console.warn("GPS error encountered:", err.message, "Falling back to IP Geolocation.");
-          const res = await runIpFallback();
-          resolve(res);
+          console.warn("GPS error encountered:", err.message);
+          
+          // If permission is denied or location is off, DO NOT fall back to IP-based location!
+          if (err.code === err.PERMISSION_DENIED) {
+            console.warn("Location permission was explicitly denied. Not adding any city.");
+            if (!isBackground) {
+              setLocationPermissionError(true);
+            }
+            LocationState.isLoading = false;
+            hideLocationIndicator();
+            hideMinimalIndicator();
+            resolve(null);
+            return;
+          }
+
+          // For other general errors (e.g., timeout, position unavailable) during manual setup, we also block IP fallback to avoid adding arbitrary wrong location
+          if (!isBackground) {
+            console.warn("Location signals unavailable. Not saving any arbitrary city.");
+            setLocationPermissionError(true);
+            LocationState.isLoading = false;
+            hideLocationIndicator();
+            hideMinimalIndicator();
+            resolve(null);
+          } else {
+            // Background update can try IP fallback as safety
+            const res = await runIpFallback();
+            resolve(res);
+          }
         },
         {
           enableHighAccuracy: false,
@@ -1335,9 +1449,9 @@ export default function App() {
           if (age > 5 * 60 * 1000) {
             isLocationPermissionOn().then(isGranted => {
               if (isGranted) {
-                fetchCurrentLocation(true);
+                fetchCurrentLocation(true).catch(e => console.warn("fetchCurrentLocation failed on visibility change:", e));
               }
-            });
+            }).catch(e => console.warn("isLocationPermissionOn check failed on visibility change:", e));
           }
         }
       }
@@ -1381,11 +1495,11 @@ export default function App() {
   const [showAlertsWithDelay, setShowAlertsWithDelay] = useState(false);
 
   useEffect(() => {
+    setActiveAlerts([]); // Clear instantly when city changes or is loading
+    setShowAlertsWithDelay(false);
     if (state.loading) {
-      setShowAlertsWithDelay(false);
       return;
     }
-    setShowAlertsWithDelay(false);
     const timer = setTimeout(() => {
       setShowAlertsWithDelay(true);
     }, 2000); // 2 second delayed appearance
@@ -1406,8 +1520,9 @@ export default function App() {
   const lastScrollY = useRef(0);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', state.settings.theme);
-  }, [state.settings.theme]);
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.setAttribute('data-color-theme', state.settings.colorTheme || 'green');
+  }, [state.settings.colorTheme]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -1564,9 +1679,32 @@ export default function App() {
     }
   };
 
-  const applyWeatherGradient = (weatherCode: number, isNight: boolean) => {
+  const applyWeatherGradient = (weatherCode: number, isNight: boolean, sunriseISO?: string, sunsetISO?: string) => {
     let newGrad = "radial-gradient(circle 550px at 50% 220px, #000000 0%, #000000 100%)";
-    if (isNight) {
+    
+    // Custom Morning/Evening check
+    let specialAtmosphere: 'none' | 'morning' | 'evening' = 'none';
+    if ((weatherCode === 0 || weatherCode === 1) && sunriseISO && sunsetISO) {
+      try {
+        const nowMs = Date.now();
+        const riseTime = new Date(sunriseISO).getTime();
+        const setTime = new Date(sunsetISO).getTime();
+        
+        if (nowMs >= riseTime && nowMs <= riseTime + 1.5 * 60 * 60 * 1000) {
+          specialAtmosphere = 'morning';
+        } else if (nowMs >= setTime - 1.5 * 60 * 60 * 1000 && nowMs <= setTime) {
+          specialAtmosphere = 'evening';
+        }
+      } catch (e) {
+        console.warn("Error parsing sunrise/sunset inside applyWeatherGradient", e);
+      }
+    }
+
+    if (specialAtmosphere === 'morning') {
+      newGrad = "radial-gradient(circle 550px at 50% 220px, #ff8c00 0%, #ff5200 40%, #b22222 80%, #000000 100%)";
+    } else if (specialAtmosphere === 'evening') {
+      newGrad = "radial-gradient(circle 550px at 50% 220px, #e52d27 0%, #b31217 40%, #7a0055 80%, #000000 100%)";
+    } else if (isNight) {
       if (weatherCode === 0 || weatherCode === 1) {
         newGrad = "radial-gradient(circle 550px at 50% 220px, #0a1122 0%, #070c18 25%, #040810 50%, #020408 75%, #000000 100%)";
       } else if (weatherCode === 2 || weatherCode === 3) {
@@ -1670,14 +1808,18 @@ export default function App() {
       }));
 
       // Apply weather gradient smoothly based on Cache data
+      const riseTime = cached.data.daily?.sunrise?.[0];
+      const setTime = cached.data.daily?.sunset?.[0];
       const isNight = isNightHour(
         Date.now(),
-        cached.data.daily?.sunrise?.[0],
-        cached.data.daily?.sunset?.[0]
+        riseTime,
+        setTime
       );
       applyWeatherGradient(
         cached.data.current?.weatherCode || 0,
-        isNight
+        isNight,
+        riseTime,
+        setTime
       );
     } else {
       // No cache - show modern skeletons
@@ -1698,14 +1840,18 @@ export default function App() {
           error: null
         }));
 
+        const riseTime = fresh.daily?.sunrise?.[0];
+        const setTime = fresh.daily?.sunset?.[0];
         const isNight = isNightHour(
           Date.now(),
-          fresh.daily?.sunrise?.[0],
-          fresh.daily?.sunset?.[0]
+          riseTime,
+          setTime
         );
         applyWeatherGradient(
           fresh.current?.weatherCode || 0,
-          isNight
+          isNight,
+          riseTime,
+          setTime
         );
       } catch (err) {
         console.warn("switchToCity fetch failed:", err);
@@ -1795,6 +1941,15 @@ export default function App() {
   };
 
   const removeLocation = (index: number) => {
+    if (state.locations.length <= 1) {
+      console.warn("Cannot remove the last location");
+      return;
+    }
+    const targetLoc = state.locations[index];
+    if (targetLoc && targetLoc.isCurrentLocation) {
+      LocationState.clear();
+      console.log("Current location-based page removed in CityManager");
+    }
     setState(prev => {
       const newLocations = prev.locations.filter((_, i) => i !== index);
       const newIndex = Math.max(0, Math.min(newLocations.length - 1, prev.activeLocationIndex));
@@ -1921,6 +2076,73 @@ export default function App() {
     localStorage.setItem('app_active_index', state.activeLocationIndex.toString());
   }, [state.settings, state.locations, state.activeLocationIndex]);
 
+  // Proactively pre-translate all city names and all settings keys/descriptions whenever locations or selected language changes
+  useEffect(() => {
+    const lang = state.settings.language || 'en';
+    if (lang === 'en') return;
+
+    // 1. All city names
+    state.locations.forEach(loc => {
+      if (loc.name) {
+        fetchDynamicTranslation(loc.name, lang);
+      }
+    });
+
+    // 2. All settings titles and static terms
+    const settingsStrings = [
+      "Settings",
+      "Push alerts & summaries",
+      "Enable push alerts",
+      "Get native reports on your device",
+      "Requesting permission...",
+      "Active & Synced with Cloud",
+      "Permission Denied",
+      "Morning weather summary",
+      "Get today's dynamic weather report delivered in the morning",
+      "Night weather summary",
+      "Get tomorrow's weather outlook delivered in the evening",
+      "Threshold triggers",
+      "Rain threshold",
+      "Snow threshold",
+      "Thunderstorm alerts",
+      "Severe weather alerts",
+      "Units",
+      "Temperature Unit",
+      "Wind Speed Unit",
+      "Visibility Unit",
+      "Pressure Unit",
+      "Precipitation Unit",
+      "General",
+      "App Language",
+      "Haptic feedback",
+      "Time Format",
+      "Icons & Atmosphere",
+      "Atmosphere Glow",
+      "Experience minor UI lag on older devices? Try turning off the atmosphere glow for a smoother experience.",
+      "Theme & Styling",
+      "Icons Style",
+      "Outline",
+      "Coloured",
+      "Active Locations",
+      "Manage Locations",
+      "Add new city",
+      "About",
+      "Version",
+      "Build",
+      "Developer",
+      "Open-source license",
+      "Privacy Policy",
+      "Terms of Service",
+      "Terms of Use",
+      TERMS_CONTENT,
+      PRIVACY_CONTENT
+    ];
+
+    settingsStrings.forEach(str => {
+      fetchDynamicTranslation(str, lang);
+    });
+  }, [state.locations, state.settings.language]);
+
   // Service Worker pre-fetching strategy for adjacent cities in the swipe sequence
   useEffect(() => {
     if ('serviceWorker' in navigator && state.locations.length > 1) {
@@ -1968,17 +2190,28 @@ export default function App() {
   // Sync background weather gradient on active location/weather data change
   useEffect(() => {
     if (activeWeather) {
+      const riseTime = activeWeather.daily?.sunrise?.[0];
+      const setTime = activeWeather.daily?.sunset?.[0];
       const isNight = isNightHour(
         Date.now(),
-        activeWeather.daily?.sunrise?.[0],
-        activeWeather.daily?.sunset?.[0]
+        riseTime,
+        setTime
       );
       applyWeatherGradient(
         activeWeather.current?.weatherCode || 0,
-        isNight
+        isNight,
+        riseTime,
+        setTime
       );
     }
   }, [state.activeLocationIndex, activeWeather]);
+
+  // Update OneSignal device tags on weather load or location updates
+  useEffect(() => {
+    if (activeLocation && activeWeather) {
+      tagDeviceLocation(activeLocation.name, activeLocation.latitude, activeLocation.longitude);
+    }
+  }, [activeLocation, activeWeather]);
 
   // Push Notification Helper
   const sendNotification = async (title: string, body: string, icon: string = '/icon-192.png') => {
@@ -2022,7 +2255,7 @@ export default function App() {
     if (!isWelcomed && state.settings.pushEnabled && SafeNotif.getPermission() === "granted") {
       localStorage.setItem('nimbus_black_welcomed', 'true');
       sendNotification(
-        "🖤 Welcome to Nimbus Black",
+        "🖤 Welcome to Overcast",
         "Your ultra-minimalist, black weather experience is now active. Enjoy smooth real-time tracking and precise forecasts."
       );
     }
@@ -2214,7 +2447,7 @@ export default function App() {
       const timeStr = format(now, 'HH:mm');
       if (timeStr === state.settings.notificationTime) {
         const summary = `Today: ${formatTemp(activeWeather.daily.temperatureMax[0], state.settings.unitTemp)}°${state.settings.unitTemp}, ${activeWeather.airQuality?.description} Air.`;
-        sendNotification("Nimbus Black", summary);
+        sendNotification("Overcast", summary);
       }
     };
 
@@ -2238,8 +2471,12 @@ export default function App() {
 
   useEffect(() => {
     // 1. Initialize on app start: Push an initial state so the first back press doesn't immediately exit
-    if (window.history.state?.panel !== 'home') {
-      window.history.pushState({ panel: "home" }, "");
+    try {
+      if (window.history.state?.panel !== 'home') {
+        window.history.pushState({ panel: "home" }, "");
+      }
+    } catch (e) {
+      console.warn("history initialization failed:", e);
     }
 
     // Initialize notification states and startup alert schedulers
@@ -2298,7 +2535,11 @@ export default function App() {
         
         if (backPressCount === 1) {
           setShowExitToast(true);
-          window.history.pushState({ panel: "home" }, ""); // re-push so we get another popstate
+          try {
+            window.history.pushState({ panel: "home" }, ""); // re-push so we get another popstate
+          } catch (e) {
+            console.warn("history re-push failed:", e);
+          }
           
           if (toastTimer) clearTimeout(toastTimer);
           toastTimer = setTimeout(() => { 
@@ -2317,7 +2558,11 @@ export default function App() {
   }, []);
 
   const pushPanel = (closeFn: () => void, name: string) => {
-    window.history.pushState({ panel: name }, "");
+    try {
+      window.history.pushState({ panel: name }, "");
+    } catch (e) {
+      console.warn("pushPanel failed:", e);
+    }
     panelStackRef.current.push(closeFn);
     panelNamesRef.current.push(name);
   };
@@ -2329,29 +2574,60 @@ export default function App() {
       if (closePanel) {
         closePanel();
       }
-      try {
-        window.history.back();
-      } catch (e) {
-        console.warn("history.back failed:", e);
-      }
+      setTimeout(() => {
+        try {
+          window.history.back();
+        } catch (e) {
+          console.warn("history.back failed:", e);
+        }
+      }, 0);
     } else {
-      try {
-        window.history.back();
-      } catch (e) {
-        console.warn("history.back failed:", e);
+      setTimeout(() => {
+        try {
+          window.history.back();
+        } catch (e) {
+          console.warn("history.back failed:", e);
+        }
+      }, 0);
+    }
+  };
+
+  const handleBackMultiple = (count: number) => {
+    if (count <= 0) return;
+    let actualPopped = 0;
+    for (let i = 0; i < count; i++) {
+      if (panelStackRef.current.length > 0) {
+        panelNamesRef.current.pop();
+        const closePanel = panelStackRef.current.pop();
+        if (closePanel) {
+          closePanel();
+        }
+        actualPopped++;
       }
+    }
+    if (actualPopped > 0) {
+      setTimeout(() => {
+        try {
+          window.history.go(-actualPopped);
+        } catch (e) {
+          console.warn("history.go failed:", e);
+        }
+      }, 0);
     }
   };
 
   const toggleSettings = () => {
     if (!state.showSettings) {
-      requestAnimationFrame(() => {
-        Haptic.medium(state.settings.hapticEnabled);
-        setState(prev => ({ ...prev, showSettings: true }));
-        pushPanel(() => setState(prev => ({ ...prev, showSettings: false })), 'settings');
-      });
+      Haptic.medium(state.settings.hapticEnabled);
+      setState(prev => ({ ...prev, showSettings: true }));
+      pushPanel(() => setState(prev => ({ ...prev, showSettings: false })), 'settings');
     } else {
-      handleBack();
+      setState(prev => ({ ...prev, showSettings: false }));
+      const idx = panelNamesRef.current.indexOf('settings');
+      if (idx !== -1) {
+        const itemsToPop = panelNamesRef.current.length - idx;
+        handleBackMultiple(itemsToPop);
+      }
     }
   };
 
@@ -2512,6 +2788,8 @@ export default function App() {
     };
   }, [state.locations.length, state.activeLocationIndex]);
 
+  const isAnyModalOpen = state.showSettings || showCityManager || showRadarMap || showSearch;
+
   const weatherContent = React.useMemo(() => {
     if (!activeWeather || !activeLocation) return null;
     
@@ -2530,6 +2808,7 @@ export default function App() {
           setIsSwiping(false);
           setIsSwipeCommitted(false);
           enableAnimations();
+          setSlideDirection(null);
         }}
         transition={{
           type: "spring",
@@ -2548,36 +2827,82 @@ export default function App() {
             onRefresh={handleRefresh}
             isRefreshing={isRefreshing}
             slideDirection={slideDirection}
+            onOpenSettings={toggleSettings}
+            onOpenCityManager={() => {
+              Haptic.medium(state.settings.hapticEnabled);
+              setShowCityManager(true);
+              pushPanel(() => setShowCityManager(false), 'citymanager');
+            }}
           />
           
           <div className="flex flex-col gap-4">
-            <HourlyForecast 
-              weather={activeWeather} 
-              settings={state.settings} 
-            />
-            {state.settings.enabledTiles?.forecast !== false && (
-              <DailyForecast 
-                weather={activeWeather} 
-                settings={state.settings} 
-              />
-            )}
-            <WeatherDetails 
-              weather={activeWeather} 
-              settings={state.settings} 
-            />
-            {state.settings.enabledTiles?.sunMoon !== false && (
-              <SunPath 
-                weather={activeWeather}
-                settings={state.settings}
-              />
-            )}
+            {!isAnyModalOpen && (state.settings.tileOrder || [
+              'rainGraph',
+              'forecast',
+              'aqi',
+              'uv',
+              'sunMoon',
+              'humidityVisibility',
+              'precipitationWind',
+              'pollen'
+            ]).map(id => {
+              if (id === 'rainGraph') {
+                return (
+                  <React.Fragment key="rainGraph">
+                    <UpcomingRainGraph 
+                      weather={activeWeather} 
+                      settings={state.settings} 
+                    />
+                  </React.Fragment>
+                );
+              }
+              if (id === 'forecast') {
+                return (
+                  <div key="forecast" className="flex flex-col gap-4">
+                    <HourlyForecast 
+                      weather={activeWeather} 
+                      settings={state.settings} 
+                    />
+                    {state.settings.enabledTiles?.forecast !== false && (
+                      <DailyForecast 
+                        weather={activeWeather} 
+                        settings={state.settings} 
+                      />
+                    )}
+                  </div>
+                );
+              }
+              if (id === 'sunMoon') {
+                return state.settings.enabledTiles?.sunMoon !== false && (
+                  <React.Fragment key="sunMoon">
+                    <SunPath 
+                      weather={activeWeather}
+                      settings={state.settings}
+                    />
+                  </React.Fragment>
+                );
+              }
+              if (['aqi', 'uv', 'pollen', 'humidityVisibility', 'precipitationWind'].includes(id)) {
+                return (
+                  <React.Fragment key={id}>
+                    <WeatherDetails 
+                      focusKey={id}
+                      weather={activeWeather} 
+                      settings={state.settings} 
+                      location={activeLocation || undefined}
+                    />
+                  </React.Fragment>
+                );
+              }
+              return null;
+            })}
           </div>
 
           <div className="h-24" />
         </div>
       </motion.div>
     );
-  }, [activeWeather, activeLocation, state.settings, isRefreshing, slideDirection]);
+  }, [activeWeather, activeLocation, state.settings, isRefreshing, slideDirection, isAnyModalOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -2610,8 +2935,6 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const isAnyModalOpen = state.showSettings || showCityManager || showRadarMap || showSearch;
-
   useEffect(() => {
     if (isAnyModalOpen) {
       document.body.style.overflow = 'hidden';
@@ -2633,46 +2956,21 @@ export default function App() {
   }, [isAnyModalOpen]);
 
   const currentCode = activeWeather?.current?.weatherCode || 0;
+  const currentSunrise = activeWeather?.daily?.sunrise?.[0];
+  const currentSunset = activeWeather?.daily?.sunset?.[0];
   const currentIsNight = activeWeather ? isNightHour(
     Date.now(),
-    activeWeather.daily?.sunrise?.[0],
-    activeWeather.daily?.sunset?.[0]
+    currentSunrise,
+    currentSunset
   ) : false;
+
+  const currentThemeColor = getWeatherThemeColor(currentCode, !currentIsNight);
 
   return (
     <div 
-      className="min-h-screen bg-black text-app-text font-sans selection:bg-app-text/20 transition-colors duration-500 relative"
+      className="min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-text/20 transition-colors duration-500 relative"
     >
-      {/* Smooth Cross-Fading Background Overlay */}
-      <div 
-        id="ambient-background-layers" 
-        className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none"
-        style={{
-          opacity: state.settings.backgroundGlow === 'off' 
-            ? 0 
-            : state.settings.backgroundGlow === 'static' 
-              ? 1 
-              : glowActive ? 1 : 0,
-          transition: state.settings.backgroundGlow === 'on' && !glowActive
-            ? 'opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1)' 
-            : 'opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-        }}
-      >
-        <AtmosphereCanvas 
-          weatherCode={currentCode}
-          isNight={currentIsNight}
-          settings={state.settings}
-        />
-        {/* 10-bit custom digital grain dither overlay to cancel 8-bit banding */}
-        {state.settings.backgroundGlow !== 'off' && (
-          <div 
-            className="absolute inset-0 pointer-events-none opacity-[0.025] mix-blend-overlay z-[2] gpu" 
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
-            }}
-          />
-        )}
-      </div>
+      {/* Background is clean light theme */}
       <div 
         id="ui-overlay" 
         className={cn(
@@ -2721,9 +3019,9 @@ export default function App() {
           <span id="location-status-text" style={{ color: "#94a3b8" }}></span>
         </div>
 
-        {state.locations.length > 0 && (
+        {state.locations.length > 0 && state.settings.layoutWeatherDetail !== 'compact' && (
           <motion.div 
-            className="w-full h-32 relative pointer-events-none"
+            className="w-full h-28 relative pointer-events-none"
             initial={false}
             animate={{
               y: headerVisible ? 0 : -30,
@@ -2734,19 +3032,27 @@ export default function App() {
               ease: [0.25, 0.46, 0.45, 0.94]
             }}
           >
-            <motion.div className="absolute left-6 top-8 pointer-events-auto">
+            <motion.div className={cn(
+              "absolute left-6 top-[calc(env(safe-area-inset-top,24px)+36px)]",
+              (state.showSettings || showCityManager || showRadarMap) ? "pointer-events-none" : "pointer-events-auto"
+            )}>
               <motion.button 
                 id="radar-map-btn"
                 onClick={() => {
-                  Haptic.medium(state.settings.hapticEnabled);
-                  setShowRadarMap(true);
-                  pushPanel(() => setShowRadarMap(false), 'radarmap');
+                   Haptic.medium(state.settings.hapticEnabled);
+                   setShowRadarMap(true);
+                   pushPanel(() => setShowRadarMap(false), 'radarmap');
                 }}
-                className="w-12 h-12 bg-white/10 border border-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-app-text shadow-xl active:scale-97 transition-all lg:hover:scale-105 pointer-events-auto"
+                style={{ 
+                  pointerEvents: (state.showSettings || showCityManager || showRadarMap) ? 'none' : 'auto'
+                }}
+                className={cn(
+                  "w-12 h-12 bg-app-surface border border-app-border backdrop-blur-xl rounded-full flex items-center justify-center text-app-text shadow-xl active:scale-97 transition-all lg:hover:scale-105 relative overflow-hidden",
+                  (state.showSettings || showCityManager || showRadarMap) ? "pointer-events-none" : "pointer-events-auto"
+                )}
                 initial={false}
                 animate={{
                   opacity: state.showSettings || showCityManager || showRadarMap ? 0 : 1,
-                  pointerEvents: state.showSettings || showCityManager || showRadarMap ? 'none' : 'auto',
                   scale: state.showSettings || showCityManager || showRadarMap ? 0.8 : 1,
                 }}
                 transition={{ 
@@ -2754,19 +3060,33 @@ export default function App() {
                   ease: [0.25, 0.46, 0.45, 0.94]
                 }}
               >
-                <Icons.Map className="w-5 h-5 text-app-text-dim hover:text-app-text transition-colors" />
+                {/* Glow background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-app-text/[0.04] to-transparent pointer-events-none rounded-full" />
+                <Icons.Map className="w-5 h-5 text-app-text-dim hover:text-app-text transition-colors relative z-10" />
               </motion.button>
             </motion.div>
 
             {/* Settings Button - Top Right */}
-            <motion.div className="absolute right-6 top-8 pointer-events-auto">
+            <motion.div className={cn(
+              "absolute right-6 top-[calc(env(safe-area-inset-top,24px)+36px)] z-30",
+              (state.showSettings || showCityManager || showRadarMap) ? "pointer-events-none" : "pointer-events-auto"
+            )}>
               <motion.button 
                 id="settings-btn"
-                onClick={toggleSettings}
-                className="group active:scale-97 transition-all flex items-center justify-center w-12 h-12"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSettings();
+                }}
+                style={{ 
+                  touchAction: 'manipulation',
+                  pointerEvents: (state.showSettings || showCityManager || showRadarMap) ? 'none' : 'auto'
+                }}
+                className={cn(
+                  "group active:scale-97 transition-all flex items-center justify-center w-12 h-12 relative z-30",
+                  (state.showSettings || showCityManager || showRadarMap) ? "pointer-events-none" : "pointer-events-auto"
+                )}
                 animate={{
                   opacity: state.showSettings || showCityManager || showRadarMap ? 0 : 1,
-                  pointerEvents: state.showSettings || showCityManager || showRadarMap ? 'none' : 'auto',
                   scale: state.showSettings || showCityManager || showRadarMap ? 0.8 : 1,
                 }}
                 transition={{ 
@@ -2774,8 +3094,10 @@ export default function App() {
                   ease: [0.25, 0.46, 0.45, 0.94]
                 }}
               >
-                <div className="w-12 h-12 bg-white/10 border border-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-app-text-dim group-hover:text-app-text transition-colors shadow-xl lg:hover:scale-105 pointer-events-auto">
-                  <Icons.Settings2 className="w-5 h-5" />
+                <div className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-xl rounded-full flex items-center justify-center text-app-text-dim group-hover:text-app-text transition-colors shadow-xl lg:hover:scale-105 pointer-events-auto relative overflow-hidden">
+                  {/* Glow background */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-app-text/[0.04] to-transparent pointer-events-none rounded-full" />
+                  <Icons.Settings2 className="w-5 h-5 relative z-10" />
                 </div>
               </motion.button>
             </motion.div>
@@ -2783,7 +3105,7 @@ export default function App() {
 
 
             {/* City Name & Pagination - Center */}
-            <div className="absolute top-8 flex flex-col items-center pointer-events-none mt-2" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+            <div className="absolute top-[calc(env(safe-area-inset-top,24px)+36px)] flex flex-col items-center pointer-events-none mt-2" style={{ left: '50%', transform: 'translateX(-50%)' }}>
               <AnimatePresence mode="wait">
                 {state.locations.length > 0 && (
                   <motion.div 
@@ -2801,11 +3123,17 @@ export default function App() {
                     <div className="flex items-center justify-center relative pointer-events-auto select-none gap-1.5">
                       <div className="flex items-center gap-1.5">
                         {activeLocation?.isCurrentLocation && (
-                          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-white/95 shrink-0" fill="currentColor">
+                          <svg viewBox="0 0 24 24" className={cn("w-3.5 h-3.5 shrink-0", state.settings.colorTheme === 'pink' ? "text-white" : "text-app-text")} fill="currentColor">
                             <path fillRule="evenodd" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" clipRule="evenodd" />
                           </svg>
                         )}
-                        <span id="city-name" className="text-[17px] font-semibold text-white/95">{activeLocation?.name || 'Loading...'}</span>
+                        <span id="city-name" className={cn("text-[17px] font-semibold transition-colors duration-300", state.settings.colorTheme === 'pink' ? "text-white" : "text-app-text")}>
+                          {activeLocation?.name ? (
+                            <Translate text={activeLocation.name} lang={state.settings.language || 'en'} />
+                          ) : (
+                            <Translate text="Loading..." lang={state.settings.language || 'en'} />
+                          )}
+                        </span>
                       </div>
                       <div className="absolute left-full ml-1.5 flex items-center justify-center">
                         <button 
@@ -2814,10 +3142,10 @@ export default function App() {
                             setShowCityManager(true);
                             pushPanel(() => setShowCityManager(false), 'citymanager');
                           }}
-                          className="text-white/60 hover:text-white active:scale-90 transition-all duration-150 cursor-pointer focus:outline-none flex items-center justify-center p-1"
+                          className="text-app-text-dim hover:text-app-text active:scale-90 transition-all duration-150 cursor-pointer focus:outline-none flex items-center justify-center p-1"
                           title="Edit Cities"
                         >
-                          <Icons.Pencil className="w-3.5 h-3.5" strokeWidth={2.2} />
+                          <Icons.ChevronDown className="w-4 h-4" strokeWidth={2.5} />
                         </button>
                       </div>
                     </div>
@@ -2829,7 +3157,9 @@ export default function App() {
                         className="flex items-center gap-1 px-2.5 py-0.5 rounded-full mt-1 bg-orange-500/20 border border-orange-500/30 backdrop-blur-md"
                       >
                         <Icons.CloudOff className="w-2.5 h-2.5 text-orange-500" strokeWidth={2.5} />
-                        <span className="text-[9px] font-bold text-orange-500 uppercase tracking-widest">OFFLINE</span>
+                        <span className="text-[9px] font-bold text-orange-500 uppercase tracking-widest">
+                          <Translate text="OFFLINE" lang={state.settings.language || 'en'} />
+                        </span>
                       </motion.div>
                     )}
 
@@ -2837,15 +3167,17 @@ export default function App() {
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full mt-1 bg-white/10 border border-white/20 backdrop-blur-md"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full mt-1.5 bg-app-surface border border-app-border backdrop-blur-md shadow-lg"
                       >
-                        <Icons.RotateCcw className="w-2.5 h-2.5 text-white animate-spin" strokeWidth={2.5} />
-                        <span className="text-[9px] font-bold text-white uppercase tracking-widest">Refreshing...</span>
+                        <Icons.RotateCcw className="w-3 h-3 text-app-text animate-spin" strokeWidth={2.5} />
+                        <span className="text-[10px] font-semibold text-app-text uppercase tracking-wider">
+                          <Translate text="Refreshing..." lang={state.settings.language || 'en'} />
+                        </span>
                       </motion.div>
                     )}
 
                     {state.locations.length > 1 && (
-                      <div id="city-dots" className="flex gap-1.5 mt-1.5">
+                      <div id="city-dots" className="flex gap-1.5 mt-2">
                         {state.locations.map((_, i) => (
                           <button 
                             key={i} 
@@ -2858,10 +3190,10 @@ export default function App() {
                               }
                             }}
                             className={cn(
-                              "w-1.5 h-1.5 rounded-full transition-all duration-300 pointer-events-auto",
+                              "w-1.5 h-1.5 rounded-full transition-all duration-300 pointer-events-auto outline-none focus:outline-none [-webkit-tap-highlight-color:transparent]",
                               state.activeLocationIndex === i 
-                                ? "bg-white w-5 shadow-[0_0_8px_rgba(255,255,255,0.3)]" 
-                                : "bg-white/40 hover:bg-white/60"
+                                ? "bg-app-text w-5 shadow-[0_0_8px_rgba(255,255,255,0.15)]" 
+                                : "bg-app-text/30 hover:bg-app-text/50"
                             )} 
                           />
                         ))}
@@ -2877,27 +3209,52 @@ export default function App() {
 
       <AnimatePresence>
         {state.showSettings && (
-          <SettingsScreen 
-            settings={state.settings} 
-            onUpdate={updateSettings} 
-            onClose={toggleSettings} 
-            activeWeather={activeWeather}
-            activeLocation={activeLocation}
-            panelStackRef={panelStackRef}
-            handleBack={handleBack}
-            pushPanel={pushPanel}
-          />
+          <motion.div
+            key="settings-screen-root"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 15 }}
+            transition={{ 
+              duration: 0.18, 
+              ease: [0.25, 0.46, 0.45, 0.94]
+            }}
+            className="fixed inset-0 z-[99999] bg-app-bg overflow-hidden transform-gpu"
+          >
+            <SettingsScreen 
+              settings={state.settings} 
+              onUpdate={updateSettings} 
+              onClose={toggleSettings} 
+              activeWeather={activeWeather}
+              activeLocation={activeLocation}
+              panelStackRef={panelStackRef}
+              handleBack={handleBack}
+              pushPanel={pushPanel}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showCityManager && (
+          <motion.div 
+            key="city-manager-root"
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 10 }}
+            transition={{ 
+              duration: 0.18, 
+              ease: [0.25, 0.46, 0.45, 0.94]
+            }}
+            className="fixed inset-0 z-[99990] bg-app-bg overflow-y-auto gpu"
+            data-no-swipe
+          >
             <CityManager 
               locations={state.locations}
               activeLocationIndex={state.activeLocationIndex}
               weatherData={state.weatherData}
               hapticEnabled={state.settings.hapticEnabled}
               panelStackRef={panelStackRef}
+              lang={state.settings.language || 'en'}
               onSelect={(index) => {
                 Haptic.light(state.settings.hapticEnabled);
                 if (index !== state.activeLocationIndex) {
@@ -2919,13 +3276,27 @@ export default function App() {
                 handleBack();
               }}
             />
+          </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showSearch && (
+          <motion.div 
+            key="search-bar-root"
+            initial={{ opacity: 0, y: 30, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.98 }}
+            transition={{ 
+              duration: 0.18, 
+              ease: [0.25, 0.46, 0.45, 0.94]
+            }}
+            className="fixed inset-0 z-[99995] bg-app-bg/90 backdrop-blur-2xl flex flex-col pt-[calc(env(safe-area-inset-top)+24px)]"
+            data-no-swipe
+          >
             <SearchBar 
               hapticEnabled={state.settings.hapticEnabled}
+              lang={state.settings.language || 'en'}
               onSelect={(loc) => {
                 Haptic.success(state.settings.hapticEnabled);
                 disableAllAnimations();
@@ -2939,24 +3310,42 @@ export default function App() {
                 handleBack();
               }}
             />
+          </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showRadarMap && (
-          <WeatherRadarMap 
-            activeLocation={activeLocation!}
-            hapticEnabled={state.settings.hapticEnabled}
-            onClose={() => {
-              handleBack();
+          <motion.div
+            key="radar-map-root"
+            initial={{ opacity: 0, y: 40, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 40, scale: 0.99 }}
+            transition={{ 
+              duration: 0.18, 
+              ease: [0.25, 0.46, 0.45, 0.94]
             }}
-          />
+            className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-2xl gpu settings-panel flex flex-col will-change-transform"
+            data-no-swipe
+          >
+            <WeatherRadarMap 
+              activeLocation={activeLocation!}
+              hapticEnabled={state.settings.hapticEnabled}
+              lang={state.settings.language || 'en'}
+              onClose={() => {
+                handleBack();
+              }}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
 
       <main 
         className={cn(
-          "max-w-[390px] mx-auto px-6 pt-[calc(env(safe-area-inset-top)+112px)] pb-32 min-h-screen relative touch-pan-y bottom-content transition-all duration-350 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]",
+          "max-w-[390px] mx-auto px-6 pb-32 min-h-screen relative touch-pan-y bottom-content transition-[opacity,transform,padding-top] duration-250 ease-out",
+          state.settings.layoutWeatherDetail === 'compact'
+            ? "pt-[calc(env(safe-area-inset-top,24px)+24px)]"
+            : "pt-[calc(env(safe-area-inset-top,24px)+116px)]",
           isAnyModalOpen ? "opacity-0 pointer-events-none scale-[0.96]" : "opacity-100 scale-100"
         )}
       >
@@ -3023,31 +3412,7 @@ export default function App() {
 
          {/* Pull to refresh logic handled by gestures.ts */}
 
-        <AnimatePresence>
-          {activeWeather && showAlertsWithDelay && activeAlerts.length > 0 && (
-            <motion.div
-              key="alerts-container"
-              initial={{ opacity: 0, height: 0, y: -20 }}
-              animate={{ opacity: 1, height: 'auto', y: 0 }}
-              exit={{ opacity: 0, height: 0, y: -20 }}
-              transition={{
-                duration: 0.22,
-                ease: [0.16, 1, 0.3, 1]
-              }}
-              className="overflow-hidden w-full"
-            >
-              <AlertsDisplay 
-                alerts={activeAlerts} 
-                hapticEnabled={state.settings.hapticEnabled}
-                onDismiss={(id) => {
-                  Haptic.light(state.settings.hapticEnabled);
-                  setDismissedAlerts(prev => ({ ...prev, [id]: Date.now() }));
-                  setActiveAlerts(prev => prev.filter(a => a.id !== id));
-                }} 
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+
 
         <div className="grid grid-cols-1 grid-rows-1 items-start w-full overflow-visible">
           <AnimatePresence>
@@ -3064,32 +3429,43 @@ export default function App() {
             ) : state.locations.length === 0 ? (
               <motion.div
                 key="empty-state"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="col-start-1 row-start-1 w-full flex flex-col items-center justify-between min-h-[calc(100vh-220px)] py-12 px-2 relative"
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                className="col-start-1 row-start-1 w-full flex flex-col items-center justify-center min-h-[calc(100vh-140px)] py-12 px-4 relative overflow-hidden"
               >
                 {!isLocatingOnboarding ? (
                   <>
-                    <div className="flex flex-col items-center mt-8 z-10 w-full">
-                      <h1 className="text-[34px] font-bold tracking-tight text-white text-center leading-tight max-w-[325px]">
-                        Welcome to Nimbus Black
+                    {/* Fixed sky gradient background mimicking the user's image */}
+                    <div 
+                      className="fixed inset-0 z-0 select-none pointer-events-none"
+                      style={{
+                        background: 'linear-gradient(180deg, #bfd3fa 0%, #eae6f0 45%, #fdf4eb 100%)',
+                      }} 
+                    />
+
+                    {/* Exquisite custom location icon (not standard boring map pin) */}
+                    <div className="relative flex items-center justify-center w-36 h-36 mb-6 z-10 select-none">
+                      {/* Concentric layered glowing circles */}
+                      <div className="absolute inset-0 rounded-full bg-white/20 blur-md animate-pulse" />
+                      <div className="absolute inset-2 rounded-full bg-gradient-to-b from-white/60 to-white/10 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-[6px] border border-white/45" />
+                      <div className="absolute inset-8 rounded-full bg-white flex items-center justify-center shadow-md">
+                        {/* Core sleek compass/navigation arrow */}
+                        <svg className="w-10 h-10 text-[#0560fa] filter drop-shadow-[0_2px_8px_rgba(5,96,250,0.25)]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 2L2 22L12 18L22 22L12 2Z" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <div className="absolute -inset-2 rounded-full border border-blue-500/10 animate-[ping_4s_infinite_ease-in-out]" />
+                    </div>
+
+                    <div className="flex flex-col items-center z-10 w-full mb-8">
+                      <h1 className="text-[36px] font-bold tracking-tight text-[#0c1224] text-center leading-[1.12] max-w-[325px] font-sans">
+                        <Translate text="Welcome to Overcast" lang={state.settings.language} />
                       </h1>
-                      <p className="text-white/45 text-[17px] text-center mt-3 max-w-[280px] leading-snug font-normal">
-                        Allow location access to see your local forecast
-                      </p>
                     </div>
 
-                    {/* Ambient background blob on left */}
-                    <div className="absolute -left-16 top-[37%] w-56 h-56 rounded-full bg-amber-500/[0.04] blur-[80px] pointer-events-none select-none" />
-
-                    {/* Large snowflake skeleton graphic at bottom right */}
-                    <div className="absolute -bottom-16 -right-16 text-white/[0.02] rotate-[24deg] select-none pointer-events-none">
-                      <Icons.Snowflake className="w-[280px] h-[280px] stroke-[0.4]" />
-                    </div>
-
-                    <div className="w-full flex flex-col items-center mt-16 max-w-[340px] z-10 px-4">
+                    <div className="w-full flex flex-col items-center max-w-[340px] z-10 px-4 gap-3.5">
                       <motion.button
                         id="permission-allow"
                         whileTap={{ scale: 0.97 }}
@@ -3097,9 +3473,12 @@ export default function App() {
                           Haptic.medium(state.settings.hapticEnabled);
                           fetchCurrentLocation(false);
                         }}
-                        className="w-full py-4 px-6 bg-[#a5cbfb] text-[#09101d] rounded-full text-[17px] font-semibold transition-transform duration-200 active:scale-97 hover:bg-[#b5d6ff]"
+                        className="w-full py-4 px-6 bg-[#0560fa] hover:bg-[#0452d7] text-neutral-50 rounded-[22px] text-[17px] font-semibold transition-all duration-200 active:scale-97 flex items-center justify-center gap-3 shadow-[0_12px_24px_rgba(5,96,250,0.18)]"
                       >
-                        Enable Location
+                        <Icons.Navigation className="w-5 h-5 fill-current text-neutral-50" style={{ transform: 'rotate(45deg)' }} />
+                        <span className="text-neutral-50">
+                          <Translate text="Enable Location" lang={state.settings.language} />
+                        </span>
                       </motion.button>
 
                       <motion.button
@@ -3109,9 +3488,10 @@ export default function App() {
                           Haptic.light(state.settings.hapticEnabled);
                           openSearch();
                         }}
-                        className="w-full py-4 px-6 bg-transparent border border-white/10 text-white rounded-full text-[17px] font-semibold transition-all duration-200 hover:bg-white/5 active:scale-97 mt-3"
+                        className="w-full py-4 px-6 bg-[#f7f2ed]/70 hover:bg-[#eae3db]/80 text-[#0c1224] rounded-[22px] text-[17px] font-semibold transition-all duration-200 active:scale-97 flex items-center justify-center gap-3 border border-white/50 backdrop-blur-md"
                       >
-                        Search for a City
+                        <Icons.Search className="w-5 h-5" strokeWidth={2.5} />
+                        <Translate text="Search Manually" lang={state.settings.language} />
                       </motion.button>
                     </div>
                   </>

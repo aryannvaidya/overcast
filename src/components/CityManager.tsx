@@ -5,6 +5,7 @@ import { Location, WeatherData } from '../types';
 import { cn, GLASS_STYLE_SUBTLE } from '../lib/utils';
 import { Haptic } from '../lib/haptics';
 import { getWeatherInfo, getCountryCode } from '../services/weatherService';
+import { Translate } from '../lib/translations';
 
 interface CityManagerProps {
   locations: Location[];
@@ -17,6 +18,7 @@ interface CityManagerProps {
   onReorder: (newLocations: Location[]) => void;
   onClose: () => void;
   panelStackRef: React.MutableRefObject<(() => void)[]>;
+  lang?: string;
 }
 
 interface CityListItemProps {
@@ -29,9 +31,11 @@ interface CityListItemProps {
   onSelect: (index: number) => void;
   onRemove: (e: React.MouseEvent, index: number) => void;
   onDragEnd?: () => void;
+  lang?: string;
+  canRemove: boolean;
 }
 
-const CityListItem = ({
+const CityListItem = React.memo(({
   loc,
   index,
   weather,
@@ -40,31 +44,40 @@ const CityListItem = ({
   onSelect,
   onRemove,
   onDragEnd,
+  lang = 'en',
+  canRemove
 }: CityListItemProps) => {
+  const [isDragging, setIsDragging] = React.useState(false);
   const dragControls = useDragControls();
   const info = weather ? getWeatherInfo(weather.current.weatherCode, weather.current.isDay) : null;
 
   return (
     <Reorder.Item 
-      key={`${loc.latitude}-${loc.longitude}-${loc.name}`} 
+      key={`${loc.latitude}-${loc.longitude}-${loc.name}-${loc.isCurrentLocation ? "current" : (loc.id || "manual")}`} 
       value={loc}
-      className="relative select-none"
+      className="relative select-none rounded-[28px] overflow-hidden"
+      style={{ 
+        borderRadius: '28px',
+        overflow: 'hidden'
+      }}
       drag={!loc.isCurrentLocation}
       dragListener={false}
       dragControls={dragControls}
+      onDragStart={() => setIsDragging(true)}
       onDragEnd={() => {
+        setIsDragging(false);
         Haptic.light(hapticEnabled);
         onDragEnd?.();
       }}
-      whileDrag={{ 
-        scale: 1.03, 
-        zIndex: 9999,
-        boxShadow: "0 12px 30px rgba(0,0,0,0.5)"
+      animate={{
+        scale: isDragging ? 1.03 : 1,
+        zIndex: isDragging ? 9999 : 1,
+        boxShadow: isDragging ? "0 12px 30px rgba(0,0,0,0.5)" : "0 0 0px rgba(0,0,0,0)"
       }}
       transition={{ 
         type: "spring", 
-        stiffness: 400, 
-        damping: 38 
+        stiffness: 420, 
+        damping: 32 
       }}
     >
       <motion.div
@@ -73,8 +86,10 @@ const CityListItem = ({
           onSelect(index);
         }}
         className={cn(
-          "p-5 flex items-center justify-between rounded-[28px] border transition-colors duration-200 cursor-pointer",
-          isSelected ? "bg-white/10 border-white/20" : "bg-white/5 border-white/5"
+          "p-5 flex items-center justify-between rounded-[28px] border transition-all duration-300 cursor-pointer outline-none focus:outline-none [-webkit-tap-highlight-color:transparent] select-none",
+          isSelected 
+            ? "bg-white/[0.08] border-white/[0.12] shadow-[0_0_25px_rgba(255,255,255,0.02)]" 
+            : "bg-app-surface/60 border-app-border hover:bg-app-surface/80"
         )}
       >
         <div className="flex items-center gap-4">
@@ -84,12 +99,12 @@ const CityListItem = ({
                 Haptic.light(hapticEnabled);
                 dragControls.start(e);
               }}
-              className="flex flex-col gap-1 items-center opacity-40 cursor-grab active:cursor-grabbing p-1.5 -m-1.5 touch-none"
+              className="flex flex-col gap-1 items-center opacity-40 cursor-grab active:cursor-grabbing p-1.5 -m-1.5 touch-none text-app-text outline-none focus:outline-none [-webkit-tap-highlight-color:transparent]"
             >
               <Icons.GripVertical className="w-4 h-4" />
             </div>
           ) : (
-            <div className="flex items-center justify-center shrink-0 w-4 h-4 text-white/90">
+            <div className="flex items-center justify-center shrink-0 w-4 h-4 text-app-text/90">
               <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
                 <path fillRule="evenodd" clipRule="evenodd" d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm0 10c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z" />
               </svg>
@@ -98,9 +113,11 @@ const CityListItem = ({
           
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-[17px] font-semibold">{loc.name}</span>
+              <span className="text-[17px] font-semibold text-app-text">
+                <Translate text={loc.name} lang={lang} />
+              </span>
             </div>
-            <span className="text-[13px] text-white/45">
+            <span className="text-[13px] text-app-text-dim">
               {getCountryCode(loc.country)}
             </span>
           </div>
@@ -109,25 +126,25 @@ const CityListItem = ({
         <div className="flex items-center gap-6">
           {weather ? (
             <div className="flex items-center gap-3">
-               <span className="text-2xl font-semibold tracking-tight">
+               <span className="text-2xl font-semibold tracking-tight text-app-text">
                  {Math.round(weather.current.temperature)}°
                </span>
                {info && (
                  <WeatherIcon 
                    name={info.icon as any} 
-                   className="w-7 h-7 text-white" 
+                   className="w-7 h-7 text-app-text" 
                    style="outline" 
                  />
                )}
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-full border border-white/10 border-t-white animate-spin opacity-20" />
+            <div className="w-8 h-8 rounded-full border border-app-border border-t-app-text animate-spin opacity-40" />
           )}
 
-          {!loc.isCurrentLocation ? (
+          {canRemove ? (
             <button 
               onClick={(e) => onRemove(e, index)}
-              className="p-2 text-white/20 hover:text-red-400/60 transition-colors"
+              className="p-2 text-app-text/30 hover:text-red-500 transition-colors"
             >
               <Icons.Trash2 className="w-4 h-4" />
             </button>
@@ -138,7 +155,8 @@ const CityListItem = ({
       </motion.div>
     </Reorder.Item>
   );
-};
+});
+CityListItem.displayName = 'CityListItem';
 
 const CityManager = ({ 
   locations, 
@@ -150,7 +168,8 @@ const CityManager = ({
   onRemove, 
   onReorder,
   onClose,
-  panelStackRef
+  panelStackRef,
+  lang = 'en'
 }: CityManagerProps) => {
   const [localLocations, setLocalLocations] = React.useState<Location[]>(locations);
 
@@ -165,33 +184,23 @@ const CityManager = ({
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.98, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98, y: 10 }}
-      transition={{ 
-        duration: 0.4, 
-        ease: [0.22, 1, 0.36, 1],
-        scale: { duration: 0.5 },
-        opacity: { duration: 0.3 }
-      }}
-      className="fixed inset-0 z-[99990] bg-black overflow-y-auto gpu"
-      data-no-swipe
-    >
+    <>
       <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-24 pb-24">
-        <header className="flex flex-col gap-4 mb-8 px-1">
+        <header className="flex items-center justify-between mb-8 px-1">
+          <h1 className="text-[28px] font-semibold text-app-text tracking-tight leading-none">
+            <Translate text="Manage Locations" lang={lang} />
+          </h1>
           <motion.button 
-            initial={{ opacity: 0, x: -10 }}
+            initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             onClick={() => {
               Haptic.light(hapticEnabled);
               onClose();
             }}
-            className="w-10 h-10 bg-white/10 border border-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 transition-all select-none self-start"
+            className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full text-app-text hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer shrink-0"
           >
-            <Icons.ChevronLeft className="w-5 h-5 text-white" strokeWidth={2.5} />
+            <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
           </motion.button>
-          <h1 className="text-[34px] font-semibold text-white tracking-tight leading-tight">Manage Locations</h1>
         </header>
 
         <Reorder.Group 
@@ -215,7 +224,7 @@ const CityManager = ({
             const useIndex = originalIndex !== -1 ? originalIndex : 0;
             return (
               <CityListItem
-                key={`${loc.latitude}-${loc.longitude}-${loc.name}`}
+                key={`${loc.latitude}-${loc.longitude}-${loc.name}-${loc.isCurrentLocation ? "current" : (loc.id || "manual")}`}
                 loc={loc}
                 index={useIndex}
                 weather={weatherData[useIndex]}
@@ -226,6 +235,8 @@ const CityManager = ({
                 onDragEnd={() => {
                   onReorder(localLocations);
                 }}
+                lang={lang}
+                canRemove={locations.length > 1}
               />
             );
           })}
@@ -236,13 +247,15 @@ const CityManager = ({
             Haptic.medium(hapticEnabled);
             onAdd();
           }}
-          className="w-full mt-6 py-5 bg-white/10 border border-dashed border-white/20 rounded-[28px] flex items-center justify-center gap-3 text-white active:scale-95 transition-all text-[15px] font-medium"
+          className="w-full mt-6 py-5 bg-app-surface border border-dashed border-app-border rounded-[28px] flex items-center justify-center gap-3 text-app-text active:scale-95 transition-all text-[15px] font-medium cursor-pointer"
         >
-          <Icons.Plus className="w-5 h-5 text-white/60" />
-          <span>Add new city</span>
+          <Icons.Plus className="w-5 h-5 text-app-text/60" />
+          <span>
+            <Translate text="Add new city" lang={lang} />
+          </span>
         </button>
       </div>
-    </motion.div>
+    </>
   );
 };
 

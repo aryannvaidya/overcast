@@ -4,16 +4,18 @@ import { Icons } from './WeatherIcons';
 import { Location } from '../types';
 import { cn } from '../lib/utils';
 import { Haptic } from '../lib/haptics';
+import { Translate } from '../lib/translations';
 
 interface WeatherRadarMapProps {
   activeLocation: Location;
   onClose: () => void;
   hapticEnabled: boolean;
+  lang: string;
 }
 
 type RadarLayer = 'temp' | 'rain' | 'clouds' | 'wind';
 
-export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled }: WeatherRadarMapProps) {
+export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled, lang }: WeatherRadarMapProps) {
   const [activeLayer, setActiveLayer] = useState<RadarLayer>('rain');
   const [iframeLoading, setIframeLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -98,31 +100,19 @@ export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled
   const embedUrl = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&zoom=6&level=surface&overlay=${activeLayer}&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default`;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 40, scale: 0.99 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 40, scale: 0.99 }}
-      transition={{ 
-        type: "spring", 
-        damping: 30, 
-        stiffness: 300, 
-        mass: 0.8
-      }}
-      className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-2xl gpu settings-panel flex flex-col will-change-transform"
-      data-no-swipe
-    >
+    <>
       {/* Outer bounds constraints matching mobile structure */}
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col px-6 pt-[calc(env(safe-area-inset-top)+20px)] pb-8 overflow-hidden">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-8 overflow-hidden">
         
         {/* HEADER */}
         <div className="flex justify-between items-start mb-6">
           <div className="flex flex-col gap-1 pr-4">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-              <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em]">LIVE RADAR</p>
+              <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em]"><Translate text="LIVE RADAR" lang={lang} /></p>
             </div>
             <h1 className="text-[28px] font-bold text-app-text tracking-tight leading-none">
-              {activeLocation.name}
+              <Translate text={activeLocation.name} lang={lang} />
             </h1>
           </div>
 
@@ -135,7 +125,7 @@ export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled
               Haptic.medium(hapticEnabled);
               onClose();
             }}
-            className="w-12 h-12 bg-white/10 border border-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 transition-all shadow-xl select-none mt-1"
+            className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full text-app-text hover:bg-app-surface/80 transition-all shadow-xl select-none mt-1 cursor-pointer"
             aria-label="Back"
           >
             <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
@@ -162,7 +152,7 @@ export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled
                 )}
               >
                 <IconComponent className={cn("w-4 h-4 shrink-0", isSelected ? "text-black" : "text-app-text-dim")} />
-                <span className="whitespace-nowrap truncate w-full text-center tracking-tight px-0.5">{layer.label}</span>
+                <span className="whitespace-nowrap truncate w-full text-center tracking-tight px-0.5"><Translate text={layer.label} lang={lang} /></span>
                 {isSelected && (
                   <div
                     className="absolute inset-0 bg-white rounded-[14px] -z-10 shadow-md"
@@ -187,12 +177,12 @@ export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled
                 <Icons.CloudOff className="w-8 h-8 text-app-text-dim" strokeWidth={1.5} />
               </div>
               <p className="text-[12px] font-black text-white uppercase tracking-[0.15em] leading-none">
-                {isOffline ? "NO NETWORK CONNECTION" : "WEAK CONNECTION detected"}
+                {isOffline ? <Translate text="NO NETWORK CONNECTION" lang={lang} /> : <Translate text="WEAK CONNECTION detected" lang={lang} />}
               </p>
               <p className="text-[14px] text-app-text-dim max-w-[280px] leading-relaxed mt-1">
                 {isOffline 
-                  ? "Connect to the internet to view real-time meteorological radar simulations."
-                  : "Your connection is too weak to stream high-density live radar simulations."
+                  ? <Translate text="Connect to the internet to view real-time meteorological radar simulations." lang={lang} />
+                  : <Translate text="Your connection is too weak to stream high-density live radar simulations." lang={lang} />
                 }
               </p>
             </div>
@@ -226,7 +216,7 @@ export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled
                       <Icons.Map className="w-5 h-5 text-indigo-400 absolute animate-pulse" />
                     </div>
                     <div className="flex flex-col items-center text-center gap-1">
-                      <p className="text-xs font-bold uppercase tracking-widest text-[#a5cbfb]">Loading Live Radar</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-[#a5cbfb]"><Translate text="Loading Live Radar" lang={lang} /></p>
                     </div>
                   </motion.div>
                 )}
@@ -236,6 +226,6 @@ export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled
         </div>
 
       </div>
-    </motion.div>
+    </>
   );
 }
