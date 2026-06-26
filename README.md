@@ -29,16 +29,6 @@
 
 ---
 
-## Star History
-
-<a href="https://www.star-history.com/?repos=aryannvaidya%2Fovercast&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
- </picture>
-</a>
-
 ## 📸 Showcase
 
 
@@ -148,4 +138,16 @@ vayu-weather/
 ## ⚖️ License
 
 This project is licensed under the MIT License.
+
+---
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=aryannvaidya%2Fovercast&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
+ </picture>
+</a>
 
