@@ -20,5 +20,32 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "widgets": [
+    {
+      "name": "Overcast Weather Widget",
+      "short_name": "Overcast Widget",
+      "description": "Shows current weather conditions and forecast on your home screen.",
+      "tag": "overcast-weather-widget",
+      "template": "weather-widget",
+      "ms_ac_template": "widgets/weather-widget-template.json",
+      "data": "widgets/weather-widget-data.json",
+      "type": "application/json",
+      "icons": [
+        {
+          "src": "/assest/icons/cloud-sun.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "/assest/preview/overcast.png",
+          "sizes": "600x400",
+          "type": "image/png",
+          "label": "Overcast Weather Widget Preview"
+        }
+      ]
+    }
   ]
 }

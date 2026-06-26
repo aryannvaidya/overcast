@@ -150,3 +150,43 @@ self.addEventListener("message", e => {
   }
 });
 
+// --- PWA WIDGET EVENTS SUPPORT ---
+self.addEventListener("widgetinstall", e => {
+  console.log("[SW] Widget installed:", e.widget);
+  e.waitUntil(
+    // Prefetch cached weather data for the active city
+    caches.open(CACHE).then(cache => {
+      return cache.addAll([
+        "/index.html",
+        "/manifest.json"
+      ]);
+    })
+  );
+});
+
+self.addEventListener("widgetuninstall", e => {
+  console.log("[SW] Widget uninstalled:", e.widget);
+});
+
+self.addEventListener("widgetresume", e => {
+  console.log("[SW] Widget resumed, updating payload:", e.widget);
+  // Optional: trigger widget payload refresh
+});
+
+self.addEventListener("widgetclick", e => {
+  console.log("[SW] Widget click action received:", e.action, e.widget);
+  e.waitUntil(
+    self.clients.matchAll({ type: "window" }).then(clients => {
+      // Direct clicks open/navigate to the app main window
+      for (const client of clients) {
+        if (client.url === "/" && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("/");
+      }
+    })
+  );
+});
+
