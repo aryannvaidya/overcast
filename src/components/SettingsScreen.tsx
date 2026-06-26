@@ -1214,6 +1214,7 @@ const SettingsScreen = ({
                 </div>
                 <Icons.ChevronRight className="w-4 h-4 text-white/15" />
               </button>
+
             </div>
 
             {/* Group 2: Units & Alerts & thresholds subpages */}
