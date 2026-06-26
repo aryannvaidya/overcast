@@ -19,6 +19,8 @@ import CityManager from './components/CityManager';
 import WeatherRadarMap from './components/WeatherRadarMap';
 import AlertsDisplay from './components/AlertsDisplay';
 import AtmosphereCanvas from './components/AtmosphereCanvas';
+import WeatherWidgetView from './components/WeatherWidgetView';
+import { calibrateTemperature } from './services/mlService';
 import { Haptic } from './lib/haptics';
 import { format } from 'date-fns';
 import { Translate, fetchDynamicTranslation } from './lib/translations';
@@ -2184,8 +2186,34 @@ export default function App() {
     }
   }, [state.activeLocationIndex, state.locations]);
 
-  const activeWeather = state.weatherData[state.activeLocationIndex];
+  const rawActiveWeather = state.weatherData[state.activeLocationIndex];
   const activeLocation = state.locations[state.activeLocationIndex];
+
+  // Dynamically calibrate activeWeather on-the-fly using our ML model if enabled
+  const activeWeather = React.useMemo(() => {
+    if (!rawActiveWeather || !state.settings.mlEnabled || !activeLocation) {
+      return rawActiveWeather;
+    }
+    const cityKey = getCityKey(activeLocation);
+    return {
+      ...rawActiveWeather,
+      current: {
+        ...rawActiveWeather.current,
+        temperature: calibrateTemperature(cityKey, rawActiveWeather.current.temperature),
+        apparentTemperature: calibrateTemperature(cityKey, rawActiveWeather.current.apparentTemperature),
+      },
+      hourly: {
+        ...rawActiveWeather.hourly,
+        temperature: rawActiveWeather.hourly.temperature.map(t => calibrateTemperature(cityKey, t)),
+        temperature_2m: rawActiveWeather.hourly.temperature_2m?.map(t => calibrateTemperature(cityKey, t)) || [],
+      },
+      daily: {
+        ...rawActiveWeather.daily,
+        temperatureMax: rawActiveWeather.daily.temperatureMax.map(t => calibrateTemperature(cityKey, t)),
+        temperatureMin: rawActiveWeather.daily.temperatureMin.map(t => calibrateTemperature(cityKey, t)),
+      }
+    };
+  }, [rawActiveWeather, state.settings.mlEnabled, activeLocation]);
 
   // Sync background weather gradient on active location/weather data change
   useEffect(() => {
@@ -2964,7 +2992,19 @@ export default function App() {
     currentSunset
   ) : false;
 
-  const currentThemeColor = getWeatherThemeColor(currentCode, !currentIsNight);
+  if (window.location.pathname === '/widget') {
+    return (
+      <WeatherWidgetView
+        locations={state.locations}
+        weatherData={state.weatherData}
+        activeLocationIndex={state.activeLocationIndex}
+        settings={state.settings}
+        onClose={() => {
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
 
   return (
     <div 

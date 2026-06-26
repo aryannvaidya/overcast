@@ -19,7 +19,7 @@ import {
   wireThresholdToggle,
   applyNotifToggleStates
 } from '../services/oneSignalService';
-import { Package, Cloud, FileText, Shield, ArrowUpRight, Info, Bell, Sliders, Activity, ShieldCheck, HelpCircle, LogOut, Check, Bug, Heart, Star, ArrowUp, ArrowDown, TrendingUp, Calendar, Sun, Moon, Eye, Wind, Compass, GripVertical } from 'lucide-react';
+import { Package, Cloud, FileText, Shield, ArrowUpRight, Info, Bell, Sliders, Activity, ShieldCheck, HelpCircle, LogOut, Check, Bug, Heart, Star, ArrowUp, ArrowDown, TrendingUp, Calendar, Sun, Moon, Eye, Wind, Compass, GripVertical, LayoutGrid } from 'lucide-react';
 
 export const TERMS_CONTENT = `Last Updated: June 2026
 
@@ -1210,6 +1210,22 @@ const SettingsScreen = ({
                   <Eye className="w-5 h-5 text-white/50" strokeWidth={1.8} />
                   <p className="text-[15px] font-medium text-white tracking-tight font-sans">
                     <Translate text="Appearance" lang={localSettings.language} />
+                  </p>
+                </div>
+                <Icons.ChevronRight className="w-4 h-4 text-white/15" />
+              </button>
+
+              <button 
+                onClick={() => {
+                  Haptic.medium(localSettings.hapticEnabled);
+                  window.location.href = '/widget';
+                }}
+                className="w-full p-5 flex items-center justify-between text-left active:bg-white/[0.03] transition-colors"
+              >
+                <div className="flex items-center gap-3.5">
+                  <LayoutGrid className="w-5 h-5 text-white/50" strokeWidth={1.8} />
+                  <p className="text-[15px] font-medium text-white tracking-tight font-sans">
+                    <Translate text="Widget Center" lang={localSettings.language} />
                   </p>
                 </div>
                 <Icons.ChevronRight className="w-4 h-4 text-white/15" />
