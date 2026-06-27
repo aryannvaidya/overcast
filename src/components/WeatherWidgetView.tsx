@@ -680,48 +680,15 @@ export default function WeatherWidgetView({
           </div>
         </section>
 
-        {/* INSTALL SECTION — Native widget coming soon */}
-        <section className="flex flex-col gap-3 text-left">
-          {/* Coming Soon Card */}
-          <div className="relative w-full rounded-[24px] overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] backdrop-blur-md">
-            {/* Subtle animated shimmer bar at the top */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400/60 to-transparent animate-pulse" />
-
-            <div className="flex items-start gap-4 p-5">
-              {/* Icon */}
-              <div className="shrink-0 w-11 h-11 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mt-0.5">
-                <Sparkles className="w-5 h-5 text-amber-400" />
-              </div>
-
-              {/* Text */}
-              <div className="flex flex-col gap-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[13px] font-black text-app-text tracking-tight">Native Home Screen Widgets</span>
-                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-400 border border-amber-400/20">
-                    Coming Soon
-                  </span>
-                </div>
-                <p className="text-[11.5px] text-app-text-dim leading-relaxed">
-                  We're building real Android home screen widgets that update automatically. This feature will be available in an upcoming release.
-                </p>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span className="text-[10px] font-bold text-amber-400/80 tracking-wide uppercase">Under Active Development</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Disabled button — looks intentional, not broken */}
-            <div className="px-5 pb-5">
-              <div
-                className="w-full py-3.5 px-6 rounded-2xl text-[12px] font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed select-none bg-white/[0.04] border border-white/[0.08] text-app-text-dim"
-              >
-                <Sparkles className="w-4 h-4 opacity-40" />
-                <span>Add to Home Screen</span>
-                <span className="ml-auto text-[9px] font-black tracking-widest text-amber-400/70 border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 rounded-full">SOON</span>
-              </div>
-            </div>
-          </div>
+        {/* INSTALL SECTION */}
+        <section className="flex flex-col gap-4 text-left">
+          <button
+            type="button"
+            onClick={() => { setShowToast(true); setTimeout(() => setShowToast(false), 3500); }}
+            className="w-full py-4.5 px-6 bg-emerald-600 text-white rounded-[24px] text-[13px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md opacity-70 cursor-not-allowed select-none"
+          >
+            <Sparkles className="w-4.5 h-4.5" /> Add Shortcut to Home Screen
+          </button>
         </section>
 
       </main>
@@ -736,7 +703,7 @@ export default function WeatherWidgetView({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[99999] px-6 py-4 bg-app-text/90 text-app-bg backdrop-blur-2xl rounded-2xl text-[12px] font-bold shadow-2xl pointer-events-none text-center"
           >
-            Adding Overcast to Home Screen... A shortcut icon will appear on your home screen that opens this weather view directly.
+            This feature will be available in future updates. Stay tuned! 🚀
           </motion.div>
         )}
       </AnimatePresence>
