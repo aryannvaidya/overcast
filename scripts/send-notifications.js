@@ -12,9 +12,9 @@ const firebaseConfig = JSON.parse(
   )
 );
 
-const FIREBASE_PROJECT_ID = nimbus-8e720;
-const FIREBASE_API_KEY    = 1:21014844885:web:a2595a4066cc171da6995c;
-const FIREBASE_DB_ID      = ai-studio-42655dd6-4763-475c-a28c-d0f99b200092;
+const FIREBASE_PROJECT_ID = 'nimbus-8e720';
+const FIREBASE_API_KEY    = 'AIzaSyDhGKcNiaBmNTO0U6JSBo5mu5n0_vSevPM';
+const FIREBASE_DB_ID      = 'ai-studio-42655dd6-4763-475c-a28c-d0f99b200092';
 
 const APP_ID   = process.env.ONESIGNAL_APP_ID;
 const REST_KEY = process.env.ONESIGNAL_REST_KEY;
@@ -27,7 +27,7 @@ console.log("REST_KEY present:", !!REST_KEY);
 
 const osHeaders = {
   "Content-Type": "application/json",
-  "Authorization": `Key ${REST_KEY}`,
+  "Authorization": `Basic ${REST_KEY}`,
 };
 
 // Get all OneSignal subscribers
@@ -89,6 +89,7 @@ async function getWeather(lat, lon) {
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}&longitude=${lon}` +
     `&current=temperature_2m,apparent_temperature,weather_code` +
+    `&hourly=precipitation_probability` +
     `&daily=temperature_2m_max,temperature_2m_min,weather_code` +
     `&timezone=auto`;
   const res = await fetch(url);
@@ -112,13 +113,17 @@ function getCondition(code) {
 // Send to one specific player
 async function sendToPlayer(playerId, title, body) {
   const res = await fetch(
-    "https://api.onesignal.com/notifications",
+    "https://onesignal.com/api/v1/notifications",
     {
       method: "POST",
-      headers: osHeaders,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${REST_KEY}`
+      },
       body: JSON.stringify({
         app_id:              APP_ID,
         include_player_ids:  [playerId],
+        include_subscription_ids: [playerId],
         headings:            { en: title },
         contents:            { en: body },
       }),
@@ -201,8 +206,17 @@ async function run() {
           `Storm Alert`,
           `in ${cityName}\nThunderstorm active. Stay indoors.`
         );
-      } else {
-        console.log("No severe conditions for:", cityName);
+      } else if (user?.alertRain) {
+        // Rain probability check
+        const hourlyProb = weather.hourly?.precipitation_probability ?? [];
+        const maxRainProb = Math.max(...hourlyProb.slice(0, 12), 0);
+        if (maxRainProb >= 30) { // default threshold 30%
+          await sendToPlayer(
+            sub.id,
+            `Rain Alert: Heading out? ☔`,
+            `There is a ${maxRainProb}% chance of rain in ${cityName} today. Don't forget your umbrella! 🌧️`
+          );
+        }
       }
     }
 

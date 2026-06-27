@@ -17,9 +17,10 @@ import {
   wireMorningToggle,
   wireNightToggle,
   wireThresholdToggle,
-  applyNotifToggleStates
+  applyNotifToggleStates,
+  sendSmartWelcomeNotification
 } from '../services/oneSignalService';
-import { Package, Cloud, FileText, Shield, ArrowUpRight, Info, Bell, Sliders, Activity, ShieldCheck, HelpCircle, LogOut, Check, Bug, Heart, Star, ArrowUp, ArrowDown, TrendingUp, Calendar, Sun, Moon, Eye, Wind, Compass, GripVertical } from 'lucide-react';
+import { Package, Cloud, FileText, Shield, ArrowUpRight, Info, Bell, Sliders, Activity, ShieldCheck, HelpCircle, LogOut, Check, Bug, Heart, Star, ArrowUp, ArrowDown, TrendingUp, Calendar, Sun, Moon, Eye, Wind, Compass, GripVertical, LayoutGrid } from 'lucide-react';
 
 export const TERMS_CONTENT = `Last Updated: June 2026
 
@@ -858,7 +859,7 @@ const SettingsScreen = ({
         const playerId = await initializeOneSignal(async (newId) => {
           if (newId) {
             setLocalSettings(prev => {
-              const updated = { ...prev, pushEnabled: true, oneSignalPlayerId: newId };
+              const updated = { ...prev, oneSignalPlayerId: newId };
               onUpdate(updated);
               // Push local master settings up to Firebase (never block UI)
               syncUserSettingsToFirebase(newId, updated, activeLocation || null)
@@ -866,19 +867,12 @@ const SettingsScreen = ({
               return updated;
             });
             setPushStatus('synced');
-          } else {
-            setLocalSettings(prev => {
-              const updated = { ...prev, pushEnabled: false };
-              onUpdate(updated);
-              return updated;
-            });
-            setPushStatus('idle');
           }
         });
 
         if (playerId) {
           setLocalSettings(prev => {
-            const updated = { ...prev, pushEnabled: true, oneSignalPlayerId: playerId };
+            const updated = { ...prev, oneSignalPlayerId: playerId };
             onUpdate(updated);
             // Push local master settings up to Firebase
             syncUserSettingsToFirebase(playerId, updated, activeLocation || null)
@@ -923,6 +917,10 @@ const SettingsScreen = ({
             onUpdate(finalUpdated);
             syncUserSettingsToFirebase(playerId, finalUpdated, activeLocation || null)
               .catch(err => console.warn(err));
+
+            if (activeLocation) {
+              sendSmartWelcomeNotification(activeLocation.name, activeWeather);
+            }
           }
         }).catch((e) => {
           console.warn('Silent permission query failed:', e);
@@ -1168,35 +1166,8 @@ const SettingsScreen = ({
               </button>
             </header>
 
-            {/* Group 1: Push Toggle & General subpage */}
+            {/* Group 1: General subpage */}
             <div className="w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] divide-y divide-white/[0.06] mb-5 overflow-hidden">
-              <div className="p-5 flex items-center justify-between">
-                <div className="flex items-center gap-3.5 pr-4">
-                  <Bell className="w-5 h-5 text-white/50 shrink-0" strokeWidth={1.8} />
-                  <div>
-                    <p className="text-[15px] font-medium text-white tracking-tight font-sans">
-                      <Translate text="Push notifications" lang={localSettings.language} />
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  type="button"
-                  onClick={handlePushToggle}
-                  className={cn(
-                    "toggle w-[51px] h-[31px] rounded-full transition-all duration-300 relative focus:outline-none focus:ring-0",
-                    localSettings.colorTheme === 'pink' || localSettings.colorTheme === 'midnight'
-                      ? (localSettings.pushEnabled ? "bg-white" : "bg-white/20")
-                      : (localSettings.pushEnabled ? "bg-white" : "bg-white/10")
-                  )}
-                >
-                  <div 
-                    className={cn(
-                      "absolute top-[2px] left-[2px] w-[27px] h-[27px] rounded-full shadow-md transition-all duration-250 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] will-change-transform",
-                      localSettings.pushEnabled ? "translate-x-[20px] bg-black" : "translate-x-0 bg-white"
-                    )} 
-                  />
-                </button>
-              </div>
 
               <button 
                 onClick={() => {

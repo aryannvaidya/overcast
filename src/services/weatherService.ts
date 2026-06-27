@@ -1006,7 +1006,7 @@ export async function reverseGeocode(lat: number, lon: number, langCode?: string
       const data = await response.json();
       if (data && data.features && data.features.length > 0) {
         const props = data.features[0].properties || {};
-        const name = props.district || props.locality || props.suburb || props.village || props.town || props.city || props.name;
+        const name = props.city || props.town || props.village || props.suburb || props.locality || props.district || props.name;
         if (name && name.trim().toLowerCase() !== 'unnamed road') {
           console.log('[PhotonGeocoding] Found closest city/locality:', name);
           return {
