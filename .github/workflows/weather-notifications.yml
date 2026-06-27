@@ -30,7 +30,9 @@ jobs:
           fi
 
       - name: Send notifications
-        env:
-          ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
-          ONESIGNAL_REST_KEY: ${{ secrets.ONESIGNAL_REST_KEY }}
-        run: node scripts/send-notifications.js ${{ steps.type.outputs.type }}
+  env:
+    ONESIGNAL_APP_ID:    ${{ secrets.ONESIGNAL_APP_ID }}
+    ONESIGNAL_REST_KEY:  ${{ secrets.ONESIGNAL_REST_KEY }}
+    FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+    FIREBASE_API_KEY:    ${{ secrets.FIREBASE_API_KEY }}
+  run: node scripts/send-notifications.js ${{ steps.type.outputs.type }}
