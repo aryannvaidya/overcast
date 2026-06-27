@@ -17,7 +17,8 @@ import {
   wireMorningToggle,
   wireNightToggle,
   wireThresholdToggle,
-  applyNotifToggleStates
+  applyNotifToggleStates,
+  sendSmartWelcomeNotification
 } from '../services/oneSignalService';
 import { Package, Cloud, FileText, Shield, ArrowUpRight, Info, Bell, Sliders, Activity, ShieldCheck, HelpCircle, LogOut, Check, Bug, Heart, Star, ArrowUp, ArrowDown, TrendingUp, Calendar, Sun, Moon, Eye, Wind, Compass, GripVertical, LayoutGrid } from 'lucide-react';
 
@@ -923,6 +924,10 @@ const SettingsScreen = ({
             onUpdate(finalUpdated);
             syncUserSettingsToFirebase(playerId, finalUpdated, activeLocation || null)
               .catch(err => console.warn(err));
+
+            if (activeLocation) {
+              sendSmartWelcomeNotification(activeLocation.name, activeWeather);
+            }
           }
         }).catch((e) => {
           console.warn('Silent permission query failed:', e);

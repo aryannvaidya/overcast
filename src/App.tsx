@@ -32,7 +32,8 @@ import {
   applyNotifToggleStates,
   SafeNotif,
   safeOneSignal,
-  tagDeviceLocation
+  tagDeviceLocation,
+  sendNotification
 } from './services/oneSignalService';
 
 const DEFAULT_LOCATION: Location | null = null;
@@ -993,6 +994,28 @@ export default function App() {
       
       console.log("Current location replaced successfully:", cityName);
       tagDeviceLocation(cityName, lat, lon);
+
+      // Trigger outdoor walking smart alert if push notifications are enabled
+      if (NotifSettings.enabled) {
+        try {
+          const temp = Math.round(data.current?.temperature ?? 0);
+          const weatherCode = data.current?.weatherCode ?? 0;
+          const conditionLabel = getWeatherInfo(weatherCode, data.current?.isDay !== false).label.toLowerCase();
+          const rainProb = data.hourly?.precipitationProbability?.[0] ?? 0;
+          
+          let alertBody = `Now at ${cityName}: ${temp}°C and ${conditionLabel}.`;
+          if (rainProb >= 40) {
+            alertBody += ` 🌧️ Rain is possible (${rainProb}% chance). Grab an umbrella!`;
+          } else {
+            alertBody += ` Clear conditions. Perfect for walking!`;
+          }
+          
+          sendNotification(`🚶 Smart Outdoor Weather Update`, alertBody);
+        } catch (e) {
+          console.warn("Failed sending walking notification:", e);
+        }
+      }
+
       return true;
     } catch (err) {
       console.warn("fetchWeather failed when replacing current location page, keeping previous city:", err);

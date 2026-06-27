@@ -303,6 +303,34 @@ body::-webkit-scrollbar,
   color: rgba(var(--text-primary-rgb), 0.15) !important;
 }
 
+/* Ensure widgets always preserve white text even in light mode */
+.widget-theme-override, .widget-theme-override * {
+  --widget-white: #ffffff !important;
+}
+.widget-theme-override .text-white,
+.widget-theme-override .text-neutral-50,
+.widget-theme-override [class*="text-white"] {
+  color: #ffffff !important;
+}
+.widget-theme-override .text-white\/90 { color: rgba(255, 255, 255, 0.9) !important; }
+.widget-theme-override .text-white\/80 { color: rgba(255, 255, 255, 0.8) !important; }
+.widget-theme-override .text-white\/75 { color: rgba(255, 255, 255, 0.75) !important; }
+.widget-theme-override .text-white\/70 { color: rgba(255, 255, 255, 0.7) !important; }
+.widget-theme-override .text-white\/60,
+.widget-theme-override .text-white\/55,
+.widget-theme-override .text-white\/50,
+.widget-theme-override .text-white\/45,
+.widget-theme-override .text-white\/40,
+.widget-theme-override .text-white\/30 {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+.widget-theme-override .text-white\/20,
+.widget-theme-override .text-white\/15,
+.widget-theme-override .text-white\/10 {
+  color: rgba(255, 255, 255, 0.15) !important;
+}
+
+
 /* Hardcoded card / section backgrounds to matching high glass opacity values */
 [data-theme="light"] .bg-white\/\[0\.04\] {
   background-color: var(--surface-color) !important; /* Elegant semi-white frosted glassmorphic cards matching sources page */

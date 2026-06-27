@@ -133,9 +133,26 @@ export default function WeatherWidgetView({
   const handleAddShortcut = () => {
     // 1. GoNative Android shortcut creation bridge
     if (typeof window !== 'undefined' && (window as any).gonative) {
+      const title = `${activeLocation.name} Widget`;
+      const iconUrl = window.location.origin + '/assest/icons/cloud-sun.svg';
+      
+      try {
+        const shortcuts = (window as any).gonative.shortcuts;
+        if (shortcuts) {
+          const params = { url: widgetUrl, title, icon: iconUrl };
+          if (typeof shortcuts.create === 'function') {
+            shortcuts.create(params);
+          } else if (typeof shortcuts.createShortcut === 'function') {
+            shortcuts.createShortcut(params);
+          }
+        }
+      } catch (err) {
+        console.warn("Median JS Shortcuts API call failed:", err);
+      }
+
       const encodedUrl = encodeURIComponent(widgetUrl);
-      const encodedTitle = encodeURIComponent(`${activeLocation.name} Widget`);
-      const encodedIcon = encodeURIComponent(window.location.origin + '/assest/icons/cloud-sun.svg');
+      const encodedTitle = encodeURIComponent(title);
+      const encodedIcon = encodeURIComponent(iconUrl);
       window.location.href = `gonative://shortcuts/create?url=${encodedUrl}&title=${encodedTitle}&icon=${encodedIcon}`;
       
       // Show elegant non-blocking feedback
@@ -426,7 +443,7 @@ export default function WeatherWidgetView({
           window.open(window.location.origin, '_blank');
         }}
         className={cn(
-          "w-full h-full relative cursor-pointer overflow-hidden transition-all duration-300 font-sans shadow-lg",
+          "w-full h-full relative cursor-pointer overflow-hidden transition-all duration-300 font-sans shadow-lg widget-theme-override",
           bgStyles,
           layout === 'mini' ? 'rounded-[20px] max-h-[76px]' : layout === 'detailed' ? 'rounded-[24px] max-h-[160px]' : 'rounded-[28px] max-h-[160px]'
         )}
@@ -444,7 +461,7 @@ export default function WeatherWidgetView({
       <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-app-text/[0.04] to-transparent pointer-events-none" />
 
       {/* Top Navbar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-6 pb-4 pt-[calc(env(safe-area-inset-top,24px)+1.6rem)] bg-app-bg/85 backdrop-blur-xl border-b border-app-border">
+      <header className="sticky top-0 z-50 flex items-center justify-between px-6 pb-4 pt-[calc(env(safe-area-inset-top,36px)+2.2rem)] bg-app-bg/85 backdrop-blur-xl border-b border-b-app-border/40">
         <div className="flex items-center gap-3">
           <button 
             onClick={onClose}
@@ -494,7 +511,7 @@ export default function WeatherWidgetView({
             >
               <div 
                 className={cn(
-                  "w-full h-full absolute overflow-hidden transition-all duration-300 font-sans shadow-2xl",
+                  "w-full h-full absolute overflow-hidden transition-all duration-300 font-sans shadow-2xl widget-theme-override",
                   bgStyles,
                   layout === 'mini' ? 'rounded-[20px]' : layout === 'detailed' ? 'rounded-[24px]' : 'rounded-[28px]'
                 )}
@@ -603,40 +620,6 @@ export default function WeatherWidgetView({
                 {animations ? 'ON' : 'OFF'}
               </button>
             </div>
-
-            {/* ML Calibrator Info inside Customizer */}
-            {useMLCorrection && (
-              <div className="flex flex-col gap-2 border-t border-app-border pt-4 text-left bg-amber-500/[0.02] -mx-5 px-5 pb-1 rounded-b-[30px]">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black uppercase tracking-widest text-amber-500/90 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> On-Device ML Self-Learning Calibration
-                  </span>
-                  <span className="text-[9px] bg-amber-500/15 text-amber-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                    MOS MODEL
-                  </span>
-                </div>
-                
-                {mlStats.samples >= 3 ? (
-                  <div className="grid grid-cols-2 gap-2 mt-1 text-[11px] text-app-text-dim">
-                    <div className="flex flex-col bg-app-bg/50 p-2.5 rounded-xl border border-app-border/40">
-                      <span className="text-[9px] opacity-60 font-bold uppercase tracking-wider mb-0.5">Trained Observations</span>
-                      <span className="text-[13px] font-black text-app-text">{mlStats.samples} samples</span>
-                    </div>
-                    <div className="flex flex-col bg-app-bg/50 p-2.5 rounded-xl border border-app-border/40">
-                      <span className="text-[9px] opacity-60 font-bold uppercase tracking-wider mb-0.5">Accuracy Improvement</span>
-                      <span className="text-[13px] font-black text-emerald-500">+{mlStats.improvementPct.toFixed(1)}% ({mlStats.correctedMae.toFixed(2)}° MAE)</span>
-                    </div>
-                    <div className="col-span-2 text-[9.5px] bg-amber-500/5 py-2 px-3 border border-amber-500/10 rounded-xl text-amber-600/95 italic">
-                      ML Bias Correction: Temp_calibrated = {mlStats.slope.toFixed(2)} * Temp_raw + ({mlStats.intercept >= 0 ? '+' : ''}{mlStats.intercept.toFixed(2)}°C)
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-app-text-dim italic bg-app-bg/50 p-3 rounded-xl border border-app-border/40 mt-1">
-                    Collecting historical predictions... Calibration begins automatically once 3 observations are recorded ({mlStats.samples}/3 logged). Weather data fetches will save observed pairs.
-                  </div>
-                )}
-              </div>
-            )}
 
           </div>
         </section>

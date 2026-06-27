@@ -27,6 +27,18 @@ export const tagDeviceLocation = (cityName: string, lat: number, lon: number) =>
       key: "lon", value: lon.toString()
     });
   }
+
+  safeOneSignal(async (OneSignal: any) => {
+    try {
+      if (OneSignal.User?.addTag) {
+        await OneSignal.User.addTag("city", cityName);
+        await OneSignal.User.addTag("lat", lat.toString());
+        await OneSignal.User.addTag("lon", lon.toString());
+      }
+    } catch (e) {
+      console.warn("Failed to set OneSignal web location tags:", e);
+    }
+  });
 };
 
 // ============================================================================
@@ -228,6 +240,10 @@ export const applyNotifToggleStates = () => {
 // ============================================================================
 export const wirePushToggle = async (enabled: boolean, showToast?: (msg: string) => void) => {
   NotifSettings.save("enabled", enabled);
+
+  if (enabled && typeof window !== 'undefined' && (window as any).gonative) {
+    window.location.href = 'gonative://notifications/register';
+  }
 
   safeOneSignal(async (OneSignal: any) => {
     try {
@@ -557,6 +573,10 @@ export async function initializeOneSignal(onSubscriptionChange?: (playerId: stri
 }
 
 export async function requestNotificationPermission(): Promise<string | null> {
+  if (typeof window !== 'undefined' && (window as any).gonative) {
+    window.location.href = 'gonative://notifications/register';
+  }
+
   return new Promise((resolve) => {
     try {
       safeOneSignal(async (OneSignal: any) => {
@@ -688,3 +708,20 @@ export async function fetchUserSettingsFromFirebase(
     return null;
   }
 }
+
+export const sendSmartWelcomeNotification = (cityName: string, weatherData: any) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const temp = Math.round(weatherData?.current?.temperature ?? 25);
+    const code = weatherData?.current?.weatherCode ?? 0;
+    const isDay = weatherData?.current?.isDay !== false;
+    const cond = getWeatherInfo(code, isDay).label.toLowerCase();
+    
+    sendNotification(
+      `🔔 Nimbus Smart Alerts Active`,
+      `Currently tracking weather at ${cityName} (${temp}°C, ${cond}). We will alert you immediately if rain is coming or storm conditions develop.`
+    );
+  } catch (err) {
+    console.warn("Failed sending welcome notification:", err);
+  }
+};
