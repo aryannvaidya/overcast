@@ -1185,25 +1185,6 @@ const SettingsScreen = ({
                 </div>
                 <Icons.ChevronRight className="w-4 h-4 text-white/15" />
               </button>
-
-              <button 
-                onClick={() => {
-                  Haptic.medium(localSettings.hapticEnabled);
-                  // Use history.pushState so a single back swipe returns to main page
-                  window.history.pushState({ page: 'widget' }, '', '/widget');
-                  // Force App re-render by firing a popstate-like event
-                  window.dispatchEvent(new PopStateEvent('popstate', { state: { page: 'widget' } }));
-                }}
-                className="w-full p-5 flex items-center justify-between text-left active:bg-white/[0.03] transition-colors"
-              >
-                <div className="flex items-center gap-3.5">
-                  <LayoutGrid className="w-5 h-5 text-white/50" strokeWidth={1.8} />
-                  <p className="text-[15px] font-medium text-white tracking-tight font-sans">
-                    <Translate text="Widget Center" lang={localSettings.language} />
-                  </p>
-                </div>
-                <Icons.ChevronRight className="w-4 h-4 text-white/15" />
-              </button>
             </div>
 
             {/* Group 2: Units & Alerts & thresholds subpages */}

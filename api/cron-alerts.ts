@@ -109,8 +109,8 @@ export default async function handler(request: any, response: any) {
         }
       }
       else if (hasRainEnabled && maxRainProb >= rainThreshold) {
-        alertTitle = 'Rain Trigger Alert 🌧️';
-        alertMsg = `Precipitation probability in ${cityName} has reached ${maxRainProb}%, crossing your custom ${rainThreshold}% notify threshold.`;
+        alertTitle = `Rain Alert: Heading to ${cityName}? ☔`;
+        alertMsg = `There is a ${maxRainProb}% chance of rain in ${cityName} today. Don't forget to bring an umbrella! 🌧️`;
       }
       else if (hasSnowEnabled && maxSnowfall > 0 && maxRainProb >= snowThreshold) {
         alertTitle = 'Snow Trigger Alert ❄️';

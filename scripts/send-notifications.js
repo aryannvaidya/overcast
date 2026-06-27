@@ -204,8 +204,8 @@ async function run() {
           if (maxRainProb >= user.rainThreshold) {
             await sendToPlayer(
               user.playerId,
-              `🌧️ Rain Alert`,
-              `${maxRainProb}% chance of rain in ${user.cityName} in the next 12 hours.`
+              `Rain Alert: Heading to ${user.cityName}? ☔`,
+              `There is a ${maxRainProb}% chance of rain in ${user.cityName} today. Don't forget to bring an umbrella! 🌧️`
             );
           }
         }

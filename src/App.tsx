@@ -19,7 +19,6 @@ import CityManager from './components/CityManager';
 import WeatherRadarMap from './components/WeatherRadarMap';
 import AlertsDisplay from './components/AlertsDisplay';
 import AtmosphereCanvas from './components/AtmosphereCanvas';
-import WeatherWidgetView from './components/WeatherWidgetView';
 import { calibrateTemperature } from './services/mlService';
 import { Haptic } from './lib/haptics';
 import { format } from 'date-fns';
@@ -33,7 +32,8 @@ import {
   SafeNotif,
   safeOneSignal,
   tagDeviceLocation,
-  sendNotification
+  sendNotification,
+  syncUserSettingsToFirebase
 } from './services/oneSignalService';
 
 const DEFAULT_LOCATION: Location | null = null;
@@ -488,6 +488,8 @@ export default function App() {
   });
 
   const stateRef = useRef(state);
+  const lastNotifiedCityRef = useRef<string>('');
+
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -657,10 +659,10 @@ export default function App() {
     };
   }, []);
 
-  // Bridge the active location's details to native Android SharedPreferences
-  // so the home screen widget is updated automatically.
+  // Bridge active location to Android SharedPreferences, sync to Firebase, and trigger travel notifications.
   useEffect(() => {
     const city = state.locations[state.activeLocationIndex];
+    const weather = state.weatherData[state.activeLocationIndex];
     if (city) {
       const bridge = (window as any).AndroidBridge;
       if (bridge && typeof bridge.saveLocation === 'function') {
@@ -671,8 +673,37 @@ export default function App() {
           console.warn('[AndroidBridge] Failed to call saveLocation:', e);
         }
       }
+
+      // Sync settings & location to Firebase if playerId is available
+      if (state.settings.oneSignalPlayerId) {
+        syncUserSettingsToFirebase(state.settings.oneSignalPlayerId, state.settings, city);
+      }
+
+      // Trigger location-based travel alerts
+      if (weather && lastNotifiedCityRef.current !== city.name) {
+        lastNotifiedCityRef.current = city.name;
+        
+        const temp = Math.round(weather.current.temperature);
+        const code = weather.current.weatherCode;
+        const isRainy = code >= 51;
+
+        let title = `Heading to ${city.name}? 🎒`;
+        let body = '';
+
+        if (isRainy) {
+          body = `It's rainy today in ${city.name} (${temp}°C). Don't forget to bring an umbrella! ☔🌧️`;
+        } else if (temp >= 28) {
+          body = `It's warm and sunny in ${city.name} (${temp}°C). Perfect day for sunglasses and sunscreen! 🕶️☀️`;
+        } else if (temp <= 15) {
+          body = `It's chilly in ${city.name} (${temp}°C). Make sure to wear a jacket! 🧥❄️`;
+        } else {
+          body = `Nice weather in ${city.name} today (${temp}°C). Enjoy your trip! 🚗✨`;
+        }
+
+        sendNotification(title, body);
+      }
     }
-  }, [state.activeLocationIndex, state.locations]);
+  }, [state.activeLocationIndex, state.locations, state.weatherData, state.settings.oneSignalPlayerId]);
 
   // ALSO REFRESH AQI ON CITY SWITCH (if older than 30 min OR never fetched)
   useEffect(() => {
@@ -3069,20 +3100,6 @@ export default function App() {
     currentSunset
   ) : false;
 
-  if (currentPath === '/widget') {
-    return (
-      <WeatherWidgetView
-        locations={state.locations}
-        weatherData={state.weatherData}
-        activeLocationIndex={state.activeLocationIndex}
-        settings={state.settings}
-        onClose={() => {
-          // Use history.back() so Android swipe-back also works correctly
-          window.history.back();
-        }}
-      />
-    );
-  }
   return (
     <div 
       className="min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-text/20 transition-colors duration-500 relative"
