@@ -242,7 +242,18 @@ export const wirePushToggle = async (enabled: boolean, showToast?: (msg: string)
   NotifSettings.save("enabled", enabled);
 
   if (enabled && typeof window !== 'undefined' && (window as any).gonative) {
-    window.location.href = 'gonative://notifications/register';
+    const gonative = (window as any).gonative;
+    try {
+      if (gonative.notifications?.register) {
+        gonative.notifications.register();
+      } else if (gonative.nativebridge?.custom) {
+        gonative.nativebridge.custom('gonative://notifications/register');
+      } else {
+        window.location.href = 'gonative://notifications/register';
+      }
+    } catch (e) {
+      console.warn("GoNative notifications registration call failed:", e);
+    }
   }
 
   safeOneSignal(async (OneSignal: any) => {
@@ -574,7 +585,18 @@ export async function initializeOneSignal(onSubscriptionChange?: (playerId: stri
 
 export async function requestNotificationPermission(): Promise<string | null> {
   if (typeof window !== 'undefined' && (window as any).gonative) {
-    window.location.href = 'gonative://notifications/register';
+    const gonative = (window as any).gonative;
+    try {
+      if (gonative.notifications?.register) {
+        gonative.notifications.register();
+      } else if (gonative.nativebridge?.custom) {
+        gonative.nativebridge.custom('gonative://notifications/register');
+      } else {
+        window.location.href = 'gonative://notifications/register';
+      }
+    } catch (e) {
+      console.warn("GoNative notifications registration call failed:", e);
+    }
   }
 
   return new Promise((resolve) => {

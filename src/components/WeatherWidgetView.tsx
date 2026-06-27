@@ -131,6 +131,21 @@ export default function WeatherWidgetView({
   };
 
   const handleAddShortcut = () => {
+    // Try to trigger PWA Custom Widgets API pinning request natively on supporting browsers/engines
+    if (typeof navigator !== 'undefined' && (navigator as any).widgets?.requestPin) {
+      try {
+        (navigator as any).widgets.requestPin({
+          tag: 'overcast-weather-widget'
+        }).then(() => {
+          console.log("PWA Custom Widget requestPin triggered successfully.");
+        }).catch((e: any) => {
+          console.warn("PWA Custom Widget requestPin failed:", e);
+        });
+      } catch (err) {
+        console.warn("PWA Custom Widget requestPin syntax failed:", err);
+      }
+    }
+
     // 1. GoNative Android shortcut creation bridge
     if (typeof window !== 'undefined' && (window as any).gonative) {
       const title = `${activeLocation.name} Widget`;
@@ -153,11 +168,18 @@ export default function WeatherWidgetView({
       const encodedUrl = encodeURIComponent(widgetUrl);
       const encodedTitle = encodeURIComponent(title);
       const encodedIcon = encodeURIComponent(iconUrl);
-      window.location.href = `gonative://shortcuts/create?url=${encodedUrl}&title=${encodedTitle}&icon=${encodedIcon}`;
+      const commandUrl = `gonative://shortcuts/create?url=${encodedUrl}&title=${encodedTitle}&icon=${encodedIcon}`;
+
+      const gonative = (window as any).gonative;
+      if (gonative.nativebridge?.custom) {
+        gonative.nativebridge.custom(commandUrl);
+      } else {
+        window.location.href = commandUrl;
+      }
       
       // Show elegant non-blocking feedback
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 4000);
+      setTimeout(() => setShowToast(false), 4500);
       return;
     }
 
@@ -173,7 +195,7 @@ export default function WeatherWidgetView({
     // 3. Fallback: Copy URL and show non-blocking HTML toast instruction
     navigator.clipboard.writeText(widgetUrl);
     setShowToast(true);
-    setTimeout(() => setShowToast(false), 4000);
+    setTimeout(() => setShowToast(false), 4500);
   };
 
   // Weather theme object helper
@@ -184,36 +206,36 @@ export default function WeatherWidgetView({
   // Theme Background and border style mappings
   const bgStyles = useMemo(() => {
     if (theme === 'black') {
-      return 'bg-black border border-neutral-800 text-white';
+      return 'bg-black border border-neutral-800 text-widget-white';
     }
     if (theme === 'gradient') {
       // Linear gradients corresponding to weather codes
       if (weatherCode === 0 || weatherCode === 1) {
         return isDay 
-          ? 'bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-neutral-900 border border-amber-300'
-          : 'bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 text-white border border-indigo-950';
+          ? 'bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-widget-dark border border-amber-300'
+          : 'bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 text-widget-white border border-indigo-950';
       }
       if (weatherCode === 2 || weatherCode === 3) {
         return isDay
-          ? 'bg-gradient-to-br from-blue-300 via-slate-300 to-blue-400 text-neutral-900 border border-blue-200'
-          : 'bg-gradient-to-br from-slate-800 via-slate-900 to-zinc-950 text-white border border-slate-800';
+          ? 'bg-gradient-to-br from-blue-300 via-slate-300 to-blue-400 text-widget-dark border border-blue-200'
+          : 'bg-gradient-to-br from-slate-800 via-slate-900 to-zinc-950 text-widget-white border border-slate-800';
       }
       if (weatherCode >= 50 && weatherCode <= 67) {
-        return 'bg-gradient-to-br from-slate-700 via-blue-900 to-slate-900 text-white border border-slate-700';
+        return 'bg-gradient-to-br from-slate-700 via-blue-900 to-slate-900 text-widget-white border border-slate-700';
       }
       if (weatherCode >= 71 && weatherCode <= 86) {
-        return 'bg-gradient-to-br from-sky-400 via-blue-100 to-sky-200 text-slate-800 border border-sky-300';
+        return 'bg-gradient-to-br from-sky-400 via-blue-100 to-sky-200 text-widget-dark border border-sky-300';
       }
       if (weatherCode >= 95) {
-        return 'bg-gradient-to-br from-purple-950 via-slate-900 to-amber-950 text-white border border-purple-900';
+        return 'bg-gradient-to-br from-purple-950 via-slate-900 to-amber-950 text-widget-white border border-purple-900';
       }
-      return 'bg-gradient-to-br from-neutral-900 to-neutral-950 text-white border border-neutral-800';
+      return 'bg-gradient-to-br from-neutral-900 to-neutral-950 text-widget-white border border-neutral-800';
     }
     
     // Glassmorphism default
     return isDay
-      ? 'bg-white/10 backdrop-blur-2xl border border-white/20 text-neutral-850 shadow-2xl'
-      : 'bg-black/25 backdrop-blur-2xl border border-white/10 text-white shadow-2xl';
+      ? 'bg-white/10 backdrop-blur-2xl border border-white/20 text-widget-dark shadow-2xl'
+      : 'bg-black/25 backdrop-blur-2xl border border-white/10 text-widget-white shadow-2xl';
   }, [theme, weatherCode, isDay]);
 
   // Weather Animation Overlay Renderer
@@ -646,7 +668,7 @@ export default function WeatherWidgetView({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[99999] px-6 py-4 bg-app-text/90 text-app-bg backdrop-blur-2xl rounded-2xl text-[12px] font-bold shadow-2xl pointer-events-none text-center"
           >
-            Creating widget shortcut... Please check your Home Screen!
+            Creating shortcut... If it doesn't appear, add it via: Long press Home Screen ➜ Widgets ➜ Overcast
           </motion.div>
         )}
       </AnimatePresence>

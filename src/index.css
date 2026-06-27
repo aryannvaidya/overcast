@@ -307,6 +307,12 @@ body::-webkit-scrollbar,
 .widget-theme-override, .widget-theme-override * {
   --widget-white: #ffffff !important;
 }
+.text-widget-white, .text-widget-white * {
+  color: #ffffff !important;
+}
+.text-widget-dark, .text-widget-dark * {
+  color: #0e1b12 !important;
+}
 .widget-theme-override .text-white,
 .widget-theme-override .text-neutral-50,
 .widget-theme-override [class*="text-white"] {

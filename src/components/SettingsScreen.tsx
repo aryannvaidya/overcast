@@ -1189,15 +1189,13 @@ const SettingsScreen = ({
                   onClick={handlePushToggle}
                   className={cn(
                     "toggle w-[51px] h-[31px] rounded-full transition-all duration-300 relative focus:outline-none focus:ring-0",
-                    localSettings.colorTheme === 'pink' || localSettings.colorTheme === 'midnight'
-                      ? (localSettings.pushEnabled ? "bg-white" : "bg-white/20")
-                      : (localSettings.pushEnabled ? "bg-white" : "bg-white/10")
+                    localSettings.pushEnabled ? "bg-emerald-500" : "bg-white/20"
                   )}
                 >
                   <div 
                     className={cn(
-                      "absolute top-[2px] left-[2px] w-[27px] h-[27px] rounded-full shadow-md transition-all duration-250 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] will-change-transform",
-                      localSettings.pushEnabled ? "translate-x-[20px] bg-black" : "translate-x-0 bg-white"
+                      "absolute top-[2px] left-[2px] w-[27px] h-[27px] rounded-full shadow-md transition-all duration-250 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] will-change-transform bg-white",
+                      localSettings.pushEnabled ? "translate-x-[20px]" : "translate-x-0"
                     )} 
                   />
                 </button>
@@ -1223,7 +1221,10 @@ const SettingsScreen = ({
               <button 
                 onClick={() => {
                   Haptic.medium(localSettings.hapticEnabled);
-                  window.location.href = '/widget';
+                  // Use history.pushState so a single back swipe returns to main page
+                  window.history.pushState({ page: 'widget' }, '', '/widget');
+                  // Force App re-render by firing a popstate-like event
+                  window.dispatchEvent(new PopStateEvent('popstate', { state: { page: 'widget' } }));
                 }}
                 className="w-full p-5 flex items-center justify-between text-left active:bg-white/[0.03] transition-colors"
               >

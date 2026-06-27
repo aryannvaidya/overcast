@@ -491,6 +491,19 @@ export default function App() {
     stateRef.current = state;
   }, [state]);
 
+  // Track current URL path for in-app routing without full page reloads
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, []);
+
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -3038,7 +3051,7 @@ export default function App() {
     currentSunset
   ) : false;
 
-  if (window.location.pathname === '/widget') {
+  if (currentPath === '/widget') {
     return (
       <WeatherWidgetView
         locations={state.locations}
@@ -3046,7 +3059,8 @@ export default function App() {
         activeLocationIndex={state.activeLocationIndex}
         settings={state.settings}
         onClose={() => {
-          window.location.href = '/';
+          // Use history.back() so Android swipe-back also works correctly
+          window.history.back();
         }}
       />
     );
