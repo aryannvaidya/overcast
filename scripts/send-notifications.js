@@ -12,9 +12,9 @@ const firebaseConfig = JSON.parse(
   )
 );
 
-const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
-const FIREBASE_API_KEY    = firebaseConfig.apiKey;
-const FIREBASE_DB_ID      = firebaseConfig.firestoreDatabaseId || '(default)';
+const FIREBASE_PROJECT_ID = nimbus-8e720;
+const FIREBASE_API_KEY    = 1:21014844885:web:a2595a4066cc171da6995c;
+const FIREBASE_DB_ID      = ai-studio-42655dd6-4763-475c-a28c-d0f99b200092;
 
 const APP_ID   = process.env.ONESIGNAL_APP_ID;
 const REST_KEY = process.env.ONESIGNAL_REST_KEY;
