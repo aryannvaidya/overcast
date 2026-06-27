@@ -856,6 +856,26 @@ const SettingsScreen = ({
   useEffect(() => {
     const runInit = async () => {
       try {
+        // --- PRIMARY CHECK: Read OS notification permission directly ---
+        // On GoNative/Android this is what actually matters
+        const nativePermission = typeof window !== 'undefined' && 'Notification' in window
+          ? (window as any).Notification?.permission
+          : 'default';
+
+        if (nativePermission === 'granted') {
+          // OS already granted notifications; ensure toggle reflects this
+          setLocalSettings(prev => {
+            if (!prev.pushEnabled) {
+              const updated = { ...prev, pushEnabled: true };
+              onUpdate(updated);
+              return updated;
+            }
+            return prev;
+          });
+          setPushStatus('synced');
+        }
+
+        // --- SECONDARY: Try to get OneSignal player ID if available ---
         const playerId = await initializeOneSignal(async (newId) => {
           if (newId) {
             setLocalSettings(prev => {
@@ -867,11 +887,15 @@ const SettingsScreen = ({
               return updated;
             });
             setPushStatus('synced');
-          } else {
+          } else if (nativePermission !== 'granted') {
+            // Only turn off if OS permission is also not granted
             setLocalSettings(prev => {
-              const updated = { ...prev, pushEnabled: false };
-              onUpdate(updated);
-              return updated;
+              if (prev.pushEnabled) {
+                const updated = { ...prev, pushEnabled: false };
+                onUpdate(updated);
+                return updated;
+              }
+              return prev;
             });
             setPushStatus('idle');
           }
@@ -915,6 +939,46 @@ const SettingsScreen = ({
       onUpdate(updated);
       await wirePushToggle(true, showToast);
 
+      // Poll OS permission state for up to 15s — fires when user taps Allow in system dialog
+      const pollPermission = () => {
+        let polls = 0;
+        const maxPolls = 30; // 30 * 500ms = 15 seconds
+        const interval = setInterval(() => {
+          polls++;
+          const perm = typeof window !== 'undefined' && 'Notification' in window
+            ? (window as any).Notification?.permission
+            : 'default';
+
+          if (perm === 'granted') {
+            clearInterval(interval);
+            // Keep the toggle ON and request OneSignal player ID
+            requestNotificationPermission().then((playerId) => {
+              if (playerId) {
+                const finalUpdated = { ...updated, oneSignalPlayerId: playerId };
+                setLocalSettings(finalUpdated);
+                onUpdate(finalUpdated);
+                syncUserSettingsToFirebase(playerId, finalUpdated, activeLocation || null)
+                  .catch(err => console.warn(err));
+                if (activeLocation) {
+                  sendSmartWelcomeNotification(activeLocation.name, activeWeather);
+                }
+              }
+            }).catch((e) => console.warn('Permission polling complete:', e));
+          } else if (perm === 'denied' || polls >= maxPolls) {
+            clearInterval(interval);
+            // User denied or timed out — revert toggle to OFF
+            if (perm === 'denied') {
+              setLocalSettings(prev => {
+                const reverted = { ...prev, pushEnabled: false };
+                onUpdate(reverted);
+                return reverted;
+              });
+              setPushStatus('idle');
+            }
+          }
+        }, 500);
+      };
+
       // Request permission asynchronously behind the scenes without blocking UI
       try {
         requestNotificationPermission().then((playerId) => {
@@ -928,12 +992,17 @@ const SettingsScreen = ({
             if (activeLocation) {
               sendSmartWelcomeNotification(activeLocation.name, activeWeather);
             }
+          } else {
+            // No player ID yet — poll OS permission for native dialog response
+            pollPermission();
           }
         }).catch((e) => {
           console.warn('Silent permission query failed:', e);
+          pollPermission();
         });
       } catch (err) {
         console.warn('Async notification handle error:', err);
+        pollPermission();
       }
     }
   };

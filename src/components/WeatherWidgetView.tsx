@@ -131,71 +131,74 @@ export default function WeatherWidgetView({
   };
 
   const handleAddShortcut = () => {
-    // Try to trigger PWA Custom Widgets API pinning request natively on supporting browsers/engines
-    if (typeof navigator !== 'undefined' && (navigator as any).widgets?.requestPin) {
-      try {
-        (navigator as any).widgets.requestPin({
-          tag: 'overcast-weather-widget'
-        }).then(() => {
-          console.log("PWA Custom Widget requestPin triggered successfully.");
-        }).catch((e: any) => {
-          console.warn("PWA Custom Widget requestPin failed:", e);
-        });
-      } catch (err) {
-        console.warn("PWA Custom Widget requestPin syntax failed:", err);
-      }
-    }
+    const title = `${activeLocation.name} - Overcast Weather`;
+    const iconUrl = window.location.origin + '/assest/icons/cloud-sun.svg';
+    // Use the clean /widget URL so it opens the widget view directly
+    const shortcutUrl = `${window.location.origin}/widget?layout=${layout}&theme=${theme}&animations=${animations ? 'on' : 'off'}&location=${selectedLocIndex}`;
 
-    // 1. GoNative Android shortcut creation bridge
+    // 1. GoNative Android — try all known shortcut creation APIs
     if (typeof window !== 'undefined' && (window as any).gonative) {
-      const title = `${activeLocation.name} Widget`;
-      const iconUrl = window.location.origin + '/assest/icons/cloud-sun.svg';
-      
-      try {
-        const shortcuts = (window as any).gonative.shortcuts;
-        if (shortcuts) {
-          const params = { url: widgetUrl, title, icon: iconUrl };
-          if (typeof shortcuts.create === 'function') {
-            shortcuts.create(params);
-          } else if (typeof shortcuts.createShortcut === 'function') {
-            shortcuts.createShortcut(params);
-          }
-        }
-      } catch (err) {
-        console.warn("Median JS Shortcuts API call failed:", err);
-      }
-
-      const encodedUrl = encodeURIComponent(widgetUrl);
-      const encodedTitle = encodeURIComponent(title);
-      const encodedIcon = encodeURIComponent(iconUrl);
-      const commandUrl = `gonative://shortcuts/create?url=${encodedUrl}&title=${encodedTitle}&icon=${encodedIcon}`;
-
       const gonative = (window as any).gonative;
-      if (gonative.nativebridge?.custom) {
-        gonative.nativebridge.custom(commandUrl);
-      } else {
-        window.location.href = commandUrl;
+      let triggered = false;
+
+      // Method A: gonative.homescreen.addShortcut (Median SDK preferred)
+      try {
+        if (gonative.homescreen?.addShortcut) {
+          gonative.homescreen.addShortcut({ url: shortcutUrl, title, icon: iconUrl });
+          triggered = true;
+        }
+      } catch (e) { console.warn('homescreen.addShortcut failed:', e); }
+
+      // Method B: gonative.shortcuts.create
+      if (!triggered) {
+        try {
+          if (gonative.shortcuts?.create) {
+            gonative.shortcuts.create({ url: shortcutUrl, title, icon: iconUrl });
+            triggered = true;
+          }
+        } catch (e) { console.warn('shortcuts.create failed:', e); }
       }
-      
-      // Show elegant non-blocking feedback
+
+      // Method C: gonative://shortcuts/create URI scheme (most universal)
+      if (!triggered) {
+        try {
+          const encodedUrl = encodeURIComponent(shortcutUrl);
+          const encodedTitle = encodeURIComponent(title);
+          const encodedIcon = encodeURIComponent(iconUrl);
+          const commandUrl = `gonative://shortcuts/create?url=${encodedUrl}&title=${encodedTitle}&icon=${encodedIcon}`;
+          // Prefer nativebridge.custom() to avoid page reload
+          if (gonative.nativebridge?.custom) {
+            gonative.nativebridge.custom(commandUrl);
+          } else {
+            // Safe fallback — use iframe trick to avoid unloading current page
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = commandUrl;
+            document.body.appendChild(iframe);
+            setTimeout(() => document.body.removeChild(iframe), 1000);
+          }
+          triggered = true;
+        } catch (e) { console.warn('URI scheme shortcut failed:', e); }
+      }
+
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 4500);
+      setTimeout(() => setShowToast(false), 5000);
       return;
     }
 
-    // 2. Standard PWA install prompt
+    // 2. Standard PWA install prompt (browser)
     if ((window as any).deferredPrompt) {
       (window as any).deferredPrompt.prompt();
-      (window as any).deferredPrompt.userChoice.then((choiceResult: any) => {
+      (window as any).deferredPrompt.userChoice.then(() => {
         (window as any).deferredPrompt = null;
       });
       return;
     }
 
-    // 3. Fallback: Copy URL and show non-blocking HTML toast instruction
-    navigator.clipboard.writeText(widgetUrl);
+    // 3. Fallback: Copy URL to clipboard
+    navigator.clipboard.writeText(shortcutUrl).catch(() => {});
     setShowToast(true);
-    setTimeout(() => setShowToast(false), 4500);
+    setTimeout(() => setShowToast(false), 5000);
   };
 
   // Weather theme object helper
@@ -652,7 +655,7 @@ export default function WeatherWidgetView({
             onClick={handleAddShortcut}
             className="w-full py-4.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[24px] text-[13px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
           >
-            <Sparkles className="w-4.5 h-4.5" /> Add Widget to Home Screen
+            <Sparkles className="w-4.5 h-4.5" /> Add Shortcut to Home Screen
           </button>
         </section>
 
@@ -668,7 +671,7 @@ export default function WeatherWidgetView({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[99999] px-6 py-4 bg-app-text/90 text-app-bg backdrop-blur-2xl rounded-2xl text-[12px] font-bold shadow-2xl pointer-events-none text-center"
           >
-            Creating shortcut... If it doesn't appear, add it via: Long press Home Screen ➜ Widgets ➜ Overcast
+            Adding Overcast to Home Screen... A shortcut icon will appear on your home screen that opens this weather view directly.
           </motion.div>
         )}
       </AnimatePresence>
