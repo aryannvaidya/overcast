@@ -656,6 +656,23 @@ export default function App() {
     };
   }, []);
 
+  // Bridge the active location's details to native Android SharedPreferences
+  // so the home screen widget is updated automatically.
+  useEffect(() => {
+    const city = state.locations[state.activeLocationIndex];
+    if (city) {
+      const bridge = (window as any).AndroidBridge;
+      if (bridge && typeof bridge.saveLocation === 'function') {
+        try {
+          console.log('[AndroidBridge] Syncing location for widget:', city.name);
+          bridge.saveLocation(city.name, city.latitude, city.longitude);
+        } catch (e) {
+          console.warn('[AndroidBridge] Failed to call saveLocation:', e);
+        }
+      }
+    }
+  }, [state.activeLocationIndex, state.locations]);
+
   // ALSO REFRESH AQI ON CITY SWITCH (if older than 30 min OR never fetched)
   useEffect(() => {
     const index = state.activeLocationIndex;

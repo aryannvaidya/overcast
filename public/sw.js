@@ -1,4 +1,4 @@
-const CACHE = "nimbus-v1";
+const CACHE = "nimbus-v2";
 const ASSETS = [
   "/",
   "/index.html",
@@ -25,11 +25,6 @@ const ASSETS = [
   "/assest/static/snowy-4.svg",
   "/assest/static/snowy-5.svg",
   "/assest/static/snowy-6.svg",
-  "/assest/static/thunder.svg",
-  "/assest/static/weather-sprite.svg",
-  "/assest/static/weather.svg",
-  "/assest/static/weather_sagittarius.svg",
-  "/assest/static/weather_sunset.svg",
   "/assest/animated/day.svg",
   "/assest/animated/night.svg",
   "/assest/animated/cloudy-day-1.svg",
@@ -102,26 +97,25 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // App shell — cache first
+  // App shell — Network first, falling back to cache
   e.respondWith(
-    caches.match(e.request)
-      .then(cached => {
-        if (cached) return cached;
-        return fetch(e.request).then(res => {
-          // Cache fonts or other assets on the fly
-          if (url.origin === location.origin || url.hostname.includes("fonts.googleapis.com") || url.hostname.includes("fonts.gstatic.com")) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        });
+    fetch(e.request)
+      .then(res => {
+        // Cache local origin files or fonts on the fly
+        if (url.origin === location.origin || url.hostname.includes("fonts.googleapis.com") || url.hostname.includes("fonts.gstatic.com")) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
       })
       .catch(() => {
-        if (e.request.mode === "navigate" || (e.request.headers.get("accept") && e.request.headers.get("accept").includes("text/html"))) {
-          return caches.match("/index.html");
-        }
-        // Return a basic error response or just let the browser handle it
-        return new Response("Resource offline", { status: 503, statusText: "Offline" });
+        return caches.match(e.request).then(cached => {
+          if (cached) return cached;
+          if (e.request.mode === "navigate" || (e.request.headers.get("accept") && e.request.headers.get("accept").includes("text/html"))) {
+            return caches.match("/index.html");
+          }
+          return new Response("Resource offline", { status: 503, statusText: "Offline" });
+        });
       })
   );
 });
