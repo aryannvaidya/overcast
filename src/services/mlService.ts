@@ -4,12 +4,21 @@ export interface MLHistoryRecord {
   timestamp: number;
   predicted: number;
   actual: number;
+  isNight?: boolean; // segmented model flag
+}
+
+export interface MLModelParams {
+  slope: number;
+  intercept: number;
+  samples: number;
 }
 
 export interface MLModelStats {
   samples: number;
-  slope: number;
-  intercept: number;
+  slope: number; // overall
+  intercept: number; // overall
+  dayModel: MLModelParams;
+  nightModel: MLModelParams;
   r2: number;
   rawMae: number;
   correctedMae: number;
@@ -18,18 +27,12 @@ export interface MLModelStats {
 
 const HISTORY_KEY_PREFIX = 'app_ml_history_';
 const MODEL_KEY_PREFIX = 'app_ml_model_';
-const MAX_HISTORY_RECORDS = 150;
+const MAX_HISTORY_RECORDS = 200;
 
-/**
- * Get the localStorage key for a city's ML history
- */
 function getHistoryKey(locationKey: string): string {
   return `${HISTORY_KEY_PREFIX}${locationKey}`;
 }
 
-/**
- * Get the localStorage key for a city's trained model parameters
- */
 function getModelKey(locationKey: string): string {
   return `${MODEL_KEY_PREFIX}${locationKey}`;
 }
@@ -37,46 +40,40 @@ function getModelKey(locationKey: string): string {
 /**
  * Record a prediction-actual pair for temperature calibration
  */
-export function recordMLObservation(locationKey: string, predicted: number, actual: number) {
+export function recordMLObservation(locationKey: string, predicted: number, actual: number, isNight: boolean = false) {
   try {
     const key = getHistoryKey(locationKey);
     const raw = localStorage.getItem(key);
     const history: MLHistoryRecord[] = raw ? JSON.parse(raw) : [];
 
-    // Avoid duplicate records for the same hour/timestamp
     const nowHour = Math.floor(Date.now() / (1000 * 60 * 60)) * (1000 * 60 * 60);
     
     // Check if we already logged in the last 45 minutes to prevent spamming
     const lastRecord = history[history.length - 1];
     if (lastRecord && Math.abs(lastRecord.timestamp - nowHour) < (45 * 60 * 1000)) {
-      // Update the actual/predicted for the current hour rather than appending
       lastRecord.actual = actual;
       lastRecord.predicted = predicted;
+      lastRecord.isNight = isNight;
     } else {
       history.push({
         timestamp: Date.now(),
         predicted,
-        actual
+        actual,
+        isNight
       });
     }
 
-    // Keep history bounded
     if (history.length > MAX_HISTORY_RECORDS) {
       history.shift();
     }
 
     localStorage.setItem(key, JSON.stringify(history));
-    
-    // Trigger training automatically when a new sample is added
     trainLocalModel(locationKey);
   } catch (err) {
     console.warn('[MLService] Failed to record observation:', err);
   }
 }
 
-/**
- * Retrieve observations history
- */
 export function getMLHistory(locationKey: string): MLHistoryRecord[] {
   try {
     const key = getHistoryKey(locationKey);
@@ -88,20 +85,97 @@ export function getMLHistory(locationKey: string): MLHistoryRecord[] {
 }
 
 /**
- * Train a simple Linear Regression model (Actual = slope * Predicted + intercept)
- * using Least Squares method to calibrate raw forecasts.
+ * Solve Weighted Least Squares (WLS) for a given subset of history records
+ * Weight decays exponentially with age: weight = exp(-daysAgo / 7)
+ */
+function solveWeightedLeastSquares(records: MLHistoryRecord[]): MLModelParams {
+  const n = records.length;
+  if (n < 3) {
+    return { slope: 1.0, intercept: 0.0, samples: n };
+  }
+
+  let sumW = 0;
+  let sumWX = 0;
+  let sumWY = 0;
+  let sumWXX = 0;
+  let sumWXY = 0;
+
+  const now = Date.now();
+
+  for (const r of records) {
+    const ageDays = (now - r.timestamp) / (1000 * 60 * 60 * 24);
+    const w = Math.exp(-ageDays / 7.0); // 7-day half-decay weight
+
+    const x = r.predicted;
+    const y = r.actual;
+
+    sumW += w;
+    sumWX += w * x;
+    sumWY += w * y;
+    sumWXX += w * x * x;
+    sumWXY += w * x * y;
+  }
+
+  const meanX = sumWX / sumW;
+  const meanY = sumWY / sumW;
+
+  let num = 0;
+  let den = 0;
+
+  for (const r of records) {
+    const ageDays = (now - r.timestamp) / (1000 * 60 * 60 * 24);
+    const w = Math.exp(-ageDays / 7.0);
+
+    const x = r.predicted;
+    const y = r.actual;
+
+    num += w * (x - meanX) * (y - meanY);
+    den += w * (x - meanX) * (x - meanX);
+  }
+
+  let slope = 1.0;
+  let intercept = 0.0;
+
+  if (Math.abs(den) > 0.00001) {
+    slope = num / den;
+    intercept = meanY - slope * meanX;
+  }
+
+  // Bound slope/intercept to prevent distortions
+  if (slope < 0.6) slope = 0.6;
+  if (slope > 1.4) slope = 1.4;
+  if (intercept < -8) intercept = -8;
+  if (intercept > 8) intercept = 8;
+
+  return { slope, intercept, samples: n };
+}
+
+/**
+ * Train both segmented models (day, night) and overall model using WLS
  */
 export function trainLocalModel(locationKey: string): MLModelStats | null {
   try {
     const history = getMLHistory(locationKey);
     const n = history.length;
 
-    // We need at least 3 points to train a meaningful regression
+    // Overall model
+    const overall = solveWeightedLeastSquares(history);
+
+    // Segmented Day/Night models
+    const dayRecords = history.filter(r => !r.isNight);
+    const nightRecords = history.filter(r => r.isNight);
+
+    const dayModel = solveWeightedLeastSquares(dayRecords);
+    const nightModel = solveWeightedLeastSquares(nightRecords);
+
+    // Default stats if not enough data
     if (n < 3) {
       return {
         samples: n,
         slope: 1.0,
         intercept: 0.0,
+        dayModel,
+        nightModel,
         r2: 0.0,
         rawMae: 0.0,
         correctedMae: 0.0,
@@ -109,49 +183,30 @@ export function trainLocalModel(locationKey: string): MLModelStats | null {
       };
     }
 
-    let sumX = 0; // Predicted
-    let sumY = 0; // Actual
-    let sumXY = 0;
-    let sumXX = 0;
-    let sumYY = 0;
-
-    for (const record of history) {
-      const x = record.predicted;
-      const y = record.actual;
-      sumX += x;
-      sumY += y;
-      sumXY += x * y;
-      sumXX += x * x;
-      sumYY += y * y;
-    }
-
-    // Linear regression formula calculations
-    const denominator = n * sumXX - sumX * sumX;
-    let slope = 1.0;
-    let intercept = 0.0;
-
-    if (Math.abs(denominator) > 0.00001) {
-      slope = (n * sumXY - sumX * sumY) / denominator;
-      intercept = (sumY - slope * sumX) / n;
-    }
-
-    // Bound slope to avoid extreme distortions in case of low variance
-    if (slope < 0.5) slope = 0.5;
-    if (slope > 1.5) slope = 1.5;
-    if (intercept < -10) intercept = -10;
-    if (intercept > 10) intercept = 10;
-
-    // Calculate MAE (Mean Absolute Error) for both raw and corrected models
+    // Evaluate accuracy improvements
     let totalRawError = 0;
     let totalCorrectedError = 0;
-    let meanY = sumY / n;
+    let meanY = 0;
+    let sumY = 0;
+
+    history.forEach(r => sumY += r.actual);
+    meanY = sumY / n;
+
     let totalSumSquares = 0;
     let residualSumSquares = 0;
 
-    for (const record of history) {
-      const rawPred = record.predicted;
-      const act = record.actual;
-      const corrPred = slope * rawPred + intercept;
+    for (const r of history) {
+      const rawPred = r.predicted;
+      const act = r.actual;
+      
+      // Use segmented model if applicable, else overall
+      let corrPred = rawPred;
+      const model = r.isNight ? nightModel : dayModel;
+      if (model.samples >= 3) {
+        corrPred = model.slope * rawPred + model.intercept;
+      } else {
+        corrPred = overall.slope * rawPred + overall.intercept;
+      }
 
       totalRawError += Math.abs(rawPred - act);
       totalCorrectedError += Math.abs(corrPred - act);
@@ -162,8 +217,7 @@ export function trainLocalModel(locationKey: string): MLModelStats | null {
 
     const rawMae = totalRawError / n;
     const correctedMae = totalCorrectedError / n;
-    
-    // R-squared calculation
+
     let r2 = totalSumSquares > 0 ? 1 - (residualSumSquares / totalSumSquares) : 1;
     if (r2 < 0) r2 = 0;
 
@@ -171,8 +225,10 @@ export function trainLocalModel(locationKey: string): MLModelStats | null {
 
     const stats: MLModelStats = {
       samples: n,
-      slope,
-      intercept,
+      slope: overall.slope,
+      intercept: overall.intercept,
+      dayModel,
+      nightModel,
       r2,
       rawMae,
       correctedMae,
@@ -187,20 +243,20 @@ export function trainLocalModel(locationKey: string): MLModelStats | null {
   }
 }
 
-/**
- * Get trained model statistics and parameters
- */
 export function getMLModelStats(locationKey: string): MLModelStats {
   try {
     const raw = localStorage.getItem(getModelKey(locationKey));
     if (raw) return JSON.parse(raw);
   } catch {}
-  
-  // Default fallback stats
+
+  const history = getMLHistory(locationKey);
+  const dummyModel = { slope: 1.0, intercept: 0.0, samples: 0 };
   return {
-    samples: getMLHistory(locationKey).length,
+    samples: history.length,
     slope: 1.0,
     intercept: 0.0,
+    dayModel: dummyModel,
+    nightModel: dummyModel,
     r2: 0.0,
     rawMae: 0.0,
     correctedMae: 0.0,
@@ -209,29 +265,36 @@ export function getMLModelStats(locationKey: string): MLModelStats {
 }
 
 /**
- * Apply the ML correction to a temperature value
+ * Apply the ML correction using segmented day/night models
  */
-export function calibrateTemperature(locationKey: string, rawTemp: number): number {
+export function calibrateTemperature(locationKey: string, rawTemp: number, isNight: boolean = false): number {
   const stats = getMLModelStats(locationKey);
-  if (stats.samples < 3) return rawTemp; // Not enough training samples
-  return stats.slope * rawTemp + stats.intercept;
+  
+  // Use day/night specific model if it has enough samples
+  const model = isNight ? stats.nightModel : stats.dayModel;
+  if (model && model.samples >= 3) {
+    return model.slope * rawTemp + model.intercept;
+  }
+
+  // Fallback to overall model
+  if (stats.samples >= 3) {
+    return stats.slope * rawTemp + stats.intercept;
+  }
+
+  // Fallback to raw temperature
+  return rawTemp;
 }
 
-/**
- * Add observations from current weather data and history
- * by matching the closest loaded cached data
- */
 export function runSelfLearningBatch(locationKey: string, weather: WeatherData) {
   if (!weather || !weather.current || !weather.hourly) return;
-  
-  // Find current hour forecast prediction
+
   const times = weather.hourly.time || [];
   const temps = weather.hourly.temperature_2m || weather.hourly.temperature || [];
   const nowMs = Date.now();
-  
+
   let closestIdx = -1;
   let minDiff = Infinity;
-  
+
   for (let i = 0; i < times.length; i++) {
     const t = new Date(times[i]).getTime();
     if (isNaN(t)) continue;
@@ -242,19 +305,16 @@ export function runSelfLearningBatch(locationKey: string, weather: WeatherData) 
     }
   }
 
-  // We only log if we have a forecast prediction for the current hour
   if (closestIdx !== -1 && minDiff < 45 * 60 * 1000) {
     const predicted = temps[closestIdx];
     const actual = weather.current.temperature;
+    const isNight = !weather.current.isDay; // Determine day/night flag
     if (predicted !== undefined && actual !== undefined) {
-      recordMLObservation(locationKey, predicted, actual);
+      recordMLObservation(locationKey, predicted, actual, isNight);
     }
   }
 }
 
-/**
- * Reset ML training history for a location
- */
 export function resetMLHistory(locationKey: string) {
   try {
     localStorage.removeItem(getHistoryKey(locationKey));

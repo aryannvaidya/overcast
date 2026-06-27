@@ -2195,22 +2195,32 @@ export default function App() {
       return rawActiveWeather;
     }
     const cityKey = getCityKey(activeLocation);
+    const riseTime = rawActiveWeather.daily?.sunrise?.[0];
+    const setTime = rawActiveWeather.daily?.sunset?.[0];
+    const currentIsNight = rawActiveWeather.current?.isDay === 0;
+
     return {
       ...rawActiveWeather,
       current: {
         ...rawActiveWeather.current,
-        temperature: calibrateTemperature(cityKey, rawActiveWeather.current.temperature),
-        apparentTemperature: calibrateTemperature(cityKey, rawActiveWeather.current.apparentTemperature),
+        temperature: calibrateTemperature(cityKey, rawActiveWeather.current.temperature, currentIsNight),
+        apparentTemperature: calibrateTemperature(cityKey, rawActiveWeather.current.apparentTemperature, currentIsNight),
       },
       hourly: {
         ...rawActiveWeather.hourly,
-        temperature: rawActiveWeather.hourly.temperature.map(t => calibrateTemperature(cityKey, t)),
-        temperature_2m: rawActiveWeather.hourly.temperature_2m?.map(t => calibrateTemperature(cityKey, t)) || [],
+        temperature: rawActiveWeather.hourly.temperature.map((t, idx) => {
+          const isNight = isNightHour(rawActiveWeather.hourly.time[idx], riseTime, setTime);
+          return calibrateTemperature(cityKey, t, isNight);
+        }),
+        temperature_2m: rawActiveWeather.hourly.temperature_2m?.map((t, idx) => {
+          const isNight = isNightHour(rawActiveWeather.hourly.time[idx], riseTime, setTime);
+          return calibrateTemperature(cityKey, t, isNight);
+        }) || [],
       },
       daily: {
         ...rawActiveWeather.daily,
-        temperatureMax: rawActiveWeather.daily.temperatureMax.map(t => calibrateTemperature(cityKey, t)),
-        temperatureMin: rawActiveWeather.daily.temperatureMin.map(t => calibrateTemperature(cityKey, t)),
+        temperatureMax: rawActiveWeather.daily.temperatureMax.map(t => calibrateTemperature(cityKey, t, false)), // Day max
+        temperatureMin: rawActiveWeather.daily.temperatureMin.map(t => calibrateTemperature(cityKey, t, true)),  // Night min
       }
     };
   }, [rawActiveWeather, state.settings.mlEnabled, activeLocation]);
@@ -3005,7 +3015,6 @@ export default function App() {
       />
     );
   }
-
   return (
     <div 
       className="min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-text/20 transition-colors duration-500 relative"
