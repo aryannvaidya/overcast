@@ -133,8 +133,8 @@ export default function WeatherWidgetView({
   const handleAddShortcut = () => {
     const title = `${activeLocation.name} - Overcast Weather`;
     const iconUrl = window.location.origin + '/assest/icons/cloud-sun.svg';
-    // Use the clean /widget URL so it opens the widget view directly
-    const shortcutUrl = `${window.location.origin}/widget?layout=${layout}&theme=${theme}&animations=${animations ? 'on' : 'off'}&location=${selectedLocIndex}`;
+    // Use embed=true so the shortcut opens the beautiful full-screen weather widget view
+    const shortcutUrl = `${window.location.origin}/widget?embed=true&layout=${layout}&theme=${theme}&animations=${animations ? 'on' : 'off'}&location=${selectedLocIndex}`;
 
     // 1. GoNative Android — try all known shortcut creation APIs
     if (typeof window !== 'undefined' && (window as any).gonative) {
@@ -459,22 +459,44 @@ export default function WeatherWidgetView({
     );
   };
 
-  // Embed Mode: Render Widget standalone directly
+  // Embed Mode: Full-screen widget view (opened via home screen shortcut)
   if (isEmbed) {
     return (
-      <div 
-        onClick={() => {
-          // Open main web app
-          window.open(window.location.origin, '_blank');
-        }}
-        className={cn(
-          "w-full h-full relative cursor-pointer overflow-hidden transition-all duration-300 font-sans shadow-lg widget-theme-override",
-          bgStyles,
-          layout === 'mini' ? 'rounded-[20px] max-h-[76px]' : layout === 'detailed' ? 'rounded-[24px] max-h-[160px]' : 'rounded-[28px] max-h-[160px]'
-        )}
-      >
+      <div className={cn("w-screen h-screen flex flex-col items-center justify-center font-sans relative overflow-hidden", bgStyles, "widget-theme-override")}>
+        {/* Full-screen weather animation */}
         {renderWeatherAnimation()}
-        {renderWidgetBody()}
+
+        {/* Centered Weather Card */}
+        <div className="w-full flex-1 flex flex-col items-center justify-center gap-5 px-6 z-10 select-none">
+          <div
+            style={{
+              width: layout === 'mini' ? '300px' : layout === 'detailed' ? '240px' : '320px',
+              height: layout === 'mini' ? '80px' : layout === 'detailed' ? '240px' : '180px',
+            }}
+            className={cn(
+              "relative overflow-hidden shadow-2xl transition-all duration-300 widget-theme-override",
+              bgStyles,
+              layout === 'mini' ? 'rounded-[20px]' : layout === 'detailed' ? 'rounded-[24px]' : 'rounded-[28px]'
+            )}
+          >
+            {renderWidgetBody()}
+          </div>
+
+          {/* Last updated text */}
+          <p className="text-[11px] opacity-50 font-medium">
+            {activeLocation?.name} · Tap below to open app
+          </p>
+        </div>
+
+        {/* Open App Button at bottom */}
+        <div className="z-10 pb-10 pt-4">
+          <button
+            onClick={() => { window.location.href = window.location.origin + '/'; }}
+            className="flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-full text-[13px] font-bold shadow-xl active:scale-95 transition-all"
+          >
+            <span>Open Overcast</span>
+          </button>
+        </div>
       </div>
     );
   }
