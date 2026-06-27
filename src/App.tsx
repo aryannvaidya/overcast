@@ -3032,15 +3032,6 @@ export default function App() {
     <div 
       className="min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-text/20 transition-colors duration-500 relative"
     >
-      {activeWeather && (
-        <AtmosphereCanvas
-          weatherCode={activeWeather.current.weatherCode}
-          isNight={currentIsNight}
-          settings={state.settings}
-          sunriseISO={activeWeather.daily?.sunrise?.[0]}
-          sunsetISO={activeWeather.daily?.sunset?.[0]}
-        />
-      )}
       {/* Background is clean light theme */}
       <div 
         id="ui-overlay" 

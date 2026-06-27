@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sun, 
   Cloud, 
@@ -82,6 +83,7 @@ export default function WeatherWidgetView({
   });
 
   const [copied, setCopied] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   const activeLocation = locations[selectedLocIndex] || locations[0];
   const rawWeather = weatherData[selectedLocIndex] || weatherData[activeLocationIndex] || Object.values(weatherData)[0];
@@ -135,7 +137,10 @@ export default function WeatherWidgetView({
       const encodedTitle = encodeURIComponent(`${activeLocation.name} Widget`);
       const encodedIcon = encodeURIComponent(window.location.origin + '/assest/icons/cloud-sun.svg');
       window.location.href = `gonative://shortcuts/create?url=${encodedUrl}&title=${encodedTitle}&icon=${encodedIcon}`;
-      alert("Adding widget shortcut to home screen... Please check your launcher!");
+      
+      // Show elegant non-blocking feedback
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
       return;
     }
 
@@ -143,16 +148,15 @@ export default function WeatherWidgetView({
     if ((window as any).deferredPrompt) {
       (window as any).deferredPrompt.prompt();
       (window as any).deferredPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted PWA installation');
-        }
         (window as any).deferredPrompt = null;
       });
       return;
     }
 
-    // 3. Fallback alert guiding the user
-    alert("To add this widget:\n\n1. If you are using the app, long-press your phone's home screen, select 'Widgets', find 'Overcast', and drag it onto your screen!\n\n2. If you are in a web browser, tap your browser's menu (three dots) and choose 'Add to Home Screen'.");
+    // 3. Fallback: Copy URL and show non-blocking HTML toast instruction
+    navigator.clipboard.writeText(widgetUrl);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 4000);
   };
 
   // Weather theme object helper
@@ -305,37 +309,37 @@ export default function WeatherWidgetView({
     if (layout === 'detailed') {
       // --- 2x2 Layout ---
       return (
-        <div className="flex flex-col justify-between p-5 h-full relative z-10 text-left select-none gap-4">
+        <div className="flex flex-col justify-between p-4 h-full relative z-10 text-left select-none gap-3">
           <div className="flex items-start justify-between gap-2.5">
             <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-              <span className="text-[15px] font-extrabold tracking-tight truncate">{activeLocation.name}</span>
-              <span className="text-[11px] opacity-75 font-medium truncate">{activeLocation.country}</span>
+              <span className="text-[14px] font-extrabold tracking-tight truncate">{activeLocation.name}</span>
+              <span className="text-[10px] opacity-75 font-medium truncate">{activeLocation.country}</span>
             </div>
             <span className="text-[9px] opacity-55 font-bold uppercase tracking-wider mt-0.5 shrink-0">
               {new Intl.DateTimeFormat(settings.language || 'en', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}
             </span>
           </div>
 
-          <div className="flex items-center gap-4 py-2">
-            <WeatherIcon name={info.icon as any} style={settings.iconStyle} className="w-[48px] h-[48px] shrink-0" strokeWidth={1.6} />
-            <div className="flex flex-col">
-              <span className="text-[38px] font-light leading-none tracking-tighter">{currentTemp}°</span>
-              <span className="text-[11px] opacity-75 font-semibold uppercase tracking-wider mt-0.5 truncate max-w-[150px]">{condName}</span>
+          <div className="flex items-center gap-3 py-1">
+            <WeatherIcon name={info.icon as any} style={settings.iconStyle} className="w-[42px] h-[42px] shrink-0" strokeWidth={1.6} />
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-[34px] font-light leading-none tracking-tighter">{currentTemp}°</span>
+              <span className="text-[10px] opacity-75 font-semibold uppercase tracking-wider mt-0.5 truncate">{condName}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 border-t border-current/10 pt-3 text-[11px] opacity-80">
-            <div className="flex items-center gap-1.5">
-              <Droplet className="w-3.5 h-3.5 opacity-60 shrink-0" />
-              <span>{Math.round(weather.current.relativeHumidity)}%</span>
+          <div className="grid grid-cols-3 gap-1.5 border-t border-current/10 pt-2 text-[9.5px] opacity-80">
+            <div className="flex items-center gap-1 shrink-0">
+              <Droplet className="w-3 h-3 opacity-60 shrink-0" />
+              <span className="font-semibold">{Math.round(weather.current.relativeHumidity)}%</span>
             </div>
-            <div className="flex items-center gap-1.5 justify-center">
-              <Wind className="w-3.5 h-3.5 opacity-60 shrink-0" />
-              <span className="truncate">{formatWind(weather.current.windSpeed, settings.unitWind)}{settings.unitWind}</span>
+            <div className="flex items-center gap-1 justify-center shrink-0 min-w-0">
+              <Wind className="w-3 h-3 opacity-60 shrink-0" />
+              <span className="font-semibold truncate">{formatWind(weather.current.windSpeed, settings.unitWind)}</span>
             </div>
-            <div className="flex items-center gap-1.5 justify-end">
-              <Sun className="w-3.5 h-3.5 opacity-60 shrink-0" />
-              <span>UV {Math.round(weather.current.uvIndex)}</span>
+            <div className="flex items-center gap-1 justify-end shrink-0">
+              <Sun className="w-3 h-3 opacity-60 shrink-0" />
+              <span className="font-semibold">UV{Math.round(weather.current.uvIndex)}</span>
             </div>
           </div>
         </div>
@@ -440,7 +444,7 @@ export default function WeatherWidgetView({
       <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-app-text/[0.04] to-transparent pointer-events-none" />
 
       {/* Top Navbar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-6 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1.2rem)] bg-app-bg/85 backdrop-blur-xl border-b border-app-border">
+      <header className="sticky top-0 z-50 flex items-center justify-between px-6 pb-4 pt-[calc(env(safe-area-inset-top,24px)+1.6rem)] bg-app-bg/85 backdrop-blur-xl border-b border-app-border">
         <div className="flex items-center gap-3">
           <button 
             onClick={onClose}
@@ -483,8 +487,8 @@ export default function WeatherWidgetView({
             {/* Resizing constraint simulation for home-screen widgets */}
             <div 
               style={{
-                width: layout === 'mini' ? '300px' : layout === 'detailed' ? '160px' : '320px',
-                height: layout === 'mini' ? '76px' : '160px'
+                width: layout === 'mini' ? '300px' : layout === 'detailed' ? '190px' : '320px',
+                height: layout === 'mini' ? '80px' : layout === 'detailed' ? '190px' : '160px'
               }}
               className="relative transition-all duration-300"
             >
@@ -546,7 +550,7 @@ export default function WeatherWidgetView({
                     key={l}
                     onClick={() => setLayout(l)}
                     className={cn(
-                      "py-3 px-2 rounded-2xl text-xs font-black uppercase tracking-normal transition-all border",
+                      "py-3 px-1.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-tight transition-all border",
                       layout === l
                         ? "bg-app-text text-app-bg border-app-text shadow-sm"
                         : "bg-app-bg border-app-border text-app-text-dim hover:text-app-text"
@@ -569,13 +573,13 @@ export default function WeatherWidgetView({
                     key={t}
                     onClick={() => setTheme(t)}
                     className={cn(
-                      "py-3 px-2 rounded-2xl text-xs font-black uppercase tracking-normal transition-all border",
+                      "py-3 px-1.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-tight transition-all border",
                       theme === t
                         ? "bg-app-text text-app-bg border-app-text shadow-sm"
                         : "bg-app-bg border-app-border text-app-text-dim hover:text-app-text"
                     )}
                   >
-                    {t === 'glass' ? 'Glassmorphic' : t === 'black' ? 'AMOLED Black' : 'Gradient'}
+                    {t === 'glass' ? 'Glass' : t === 'black' ? 'AMOLED Black' : 'Gradient'}
                   </button>
                 ))}
               </div>
@@ -637,80 +641,33 @@ export default function WeatherWidgetView({
           </div>
         </section>
 
-        {/* HOW TO INSTALL / EMBED */}
-        <section className="flex flex-col gap-6 text-left">
-          <h2 className="text-xs font-black uppercase tracking-widest text-app-text-dim">How to add to your Home Screen</h2>
-          
-          <div className="bg-app-surface border border-app-border rounded-[32px] p-6 flex flex-col gap-6">
-            
-            {/* Primary One-Click Shortcut Button */}
-            <button
-              onClick={handleAddShortcut}
-              className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[12px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
-            >
-              <Sparkles className="w-4.5 h-4.5" /> Add Widget to Home Screen
-            </button>
-
-            <div className="border-t border-app-border pt-2" />
-
-            <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-bold text-app-text flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-app-text text-app-bg flex items-center justify-center text-[10px] font-black">1</span>
-                Open Customised Widget URL
-              </span>
-              <p className="text-[12px] text-app-text-dim leading-relaxed pl-6.5">
-                Open the standalone widget screen in a clean browser window by tapping the button below:
-              </p>
-              <div className="pl-6.5 mt-2 flex flex-col sm:flex-row gap-2.5">
-                <button
-                  onClick={() => window.open(widgetUrl, '_blank')}
-                  className={cn(
-                    "py-3 px-5 bg-app-text text-app-bg rounded-2xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
-                  )}
-                >
-                  <ExternalLink className="w-4 h-4" /> Open Widget Window
-                </button>
-                
-                <button
-                  onClick={handleCopyUrl}
-                  className={cn(
-                    "py-3 px-5 bg-app-bg border border-app-border text-app-text hover:text-app-text rounded-2xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                  )}
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                  <span>{copied ? 'Copied Link!' : 'Copy Widget URL'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t border-app-border pt-5">
-              <span className="text-[13px] font-bold text-app-text flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-app-text text-app-bg flex items-center justify-center text-[10px] font-black">2</span>
-                Add as a Home Screen Widget / Shortcut
-              </span>
-              <p className="text-[12px] text-app-text-dim leading-relaxed pl-6.5">
-                Once the widget window opens on your phone:
-                <br />
-                • **Android (Chrome)**: Tap the browser menu (three dots) → select **"Add to Home screen"**. It will prompt you to add it as a widget or app icon that updates dynamically!
-                <br />
-                • **iOS (Safari)**: Tap the Share button (box with up arrow) → select **"Add to Home Screen"**.
-              </p>
-            </div>
-            
-            <div className="flex flex-col gap-2 border-t border-app-border pt-5">
-              <span className="text-[13px] font-bold text-app-text flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-app-text text-app-bg flex items-center justify-center text-[10px] font-black">3</span>
-                Adjust to your mobile screen correctly
-              </span>
-              <p className="text-[12px] text-app-text-dim leading-relaxed pl-6.5">
-                Once added to your home screen, long-press the widget/shortcut to resize or reposition it. The content is responsive and will scale perfectly to fit your layout.
-              </p>
-            </div>
-
-          </div>
+        {/* INSTALL SECTION */}
+        <section className="flex flex-col gap-4 text-left">
+          <button
+            onClick={handleAddShortcut}
+            className="w-full py-4.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[24px] text-[13px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+          >
+            <Sparkles className="w-4.5 h-4.5" /> Add Widget to Home Screen
+          </button>
         </section>
 
       </main>
+
+      {/* Floating Glassmorphic Notification Toast */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[99999] px-6 py-4 bg-app-text/90 text-app-bg backdrop-blur-2xl rounded-2xl text-[12px] font-bold shadow-2xl pointer-events-none text-center"
+          >
+            Creating widget shortcut... Please check your Home Screen!
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
