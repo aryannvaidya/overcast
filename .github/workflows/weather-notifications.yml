@@ -2,11 +2,8 @@ name: Weather Notifications
 
 on:
   schedule:
-    # Morning summary — 7:30 AM IST = 2:00 AM UTC
     - cron: '0 2 * * *'
-    # Night summary — 9:00 PM IST = 3:30 PM UTC
     - cron: '30 15 * * *'
-    # Severe weather check — every 3 hours
     - cron: '0 */3 * * *'
   workflow_dispatch:
 
@@ -30,9 +27,7 @@ jobs:
           fi
 
       - name: Send notifications
-  env:
-    ONESIGNAL_APP_ID:    ${{ secrets.ONESIGNAL_APP_ID }}
-    ONESIGNAL_REST_KEY:  ${{ secrets.ONESIGNAL_REST_KEY }}
-    FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-    FIREBASE_API_KEY:    ${{ secrets.FIREBASE_API_KEY }}
-  run: node scripts/send-notifications.js ${{ steps.type.outputs.type }}
+        env:
+          ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_REST_KEY: ${{ secrets.ONESIGNAL_REST_KEY }}
+        run: node scripts/send-notifications.js ${{ steps.type.outputs.type }}
