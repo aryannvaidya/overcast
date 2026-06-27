@@ -12,56 +12,12 @@ const headers = {
   "Authorization": `Key ${REST_KEY}`,
 };
 
-async function getDevices() {
-  console.log("Fetching devices from OneSignal...");
-
-  const res = await fetch(
-    `https://api.onesignal.com/apps/${APP_ID}/subscriptions`,
-    { headers }
-  );
-
-  console.log("API status:", res.status);
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Failed to fetch devices:", res.status, err);
-    return [];
-  }
-
-  const data = await res.json();
-  console.log("Raw response keys:", Object.keys(data));
-  
-  // New API returns subscriptions array
-  const subscriptions = data.subscriptions || data.players || [];
-  console.log("Total subscriptions returned:", subscriptions.length);
-
-  const tagged = subscriptions.filter(p => p.tags?.city);
-  console.log("Devices with city tag:", tagged.length);
-
-  if (subscriptions.length > 0 && tagged.length === 0) {
-    console.log("Sample device tags (first device):",
-      JSON.stringify(subscriptions[0]?.tags));
-  }
-
-  return tagged;
-}
-
-function groupByCity(devices) {
-  const groups = {};
-  devices.forEach(d => {
-    const city = d.tags.city;
-    if (!groups[city]) {
-      groups[city] = {
-        lat: parseFloat(d.tags.lat),
-        lon: parseFloat(d.tags.lon),
-        playerIds: []
-      };
-    }
-    // New API uses id or subscription_id
-    groups[city].playerIds.push(d.id || d.subscription_id);
-  });
-  return groups;
-}
+// Default city coordinates — Delhi as fallback
+// This sends one notification to ALL subscribers
+// with weather for a single representative city
+const DEFAULT_LAT = 28.6139;
+const DEFAULT_LON = 77.2090;
+const DEFAULT_CITY = "your area";
 
 async function getWeather(lat, lon) {
   const url =
@@ -88,15 +44,15 @@ function getCondition(code) {
   return "Cloudy";
 }
 
-async function sendNotification(playerIds, title, body) {
-  console.log("Sending to", playerIds.length, "devices:", title);
+async function sendToAll(title, body) {
+  console.log("Sending to all subscribers:", title);
 
   const res = await fetch("https://api.onesignal.com/notifications", {
     method: "POST",
     headers,
     body: JSON.stringify({
       app_id: APP_ID,
-      include_subscription_ids: playerIds,
+      included_segments: ["All"],
       headings: { en: title },
       contents: { en: body },
     }),
@@ -113,69 +69,52 @@ async function sendNotification(playerIds, title, body) {
 }
 
 async function run() {
-  const devices = await getDevices();
+  const weather = await getWeather(DEFAULT_LAT, DEFAULT_LON);
+  const temp      = Math.round(weather.current.temperature_2m);
+  const feels     = Math.round(weather.current.apparent_temperature);
+  const code      = weather.current.weather_code;
+  const condition = getCondition(code);
+  const high      = Math.round(weather.daily.temperature_2m_max[0]);
+  const low       = Math.round(weather.daily.temperature_2m_min[0]);
+  const tomorrowHigh = Math.round(weather.daily.temperature_2m_max[1]);
+  const tomorrowCode = weather.daily.weather_code[1];
 
-  if (devices.length === 0) {
-    console.log("No tagged devices found. Exiting.");
-    return;
+  console.log("Weather fetched:", { temp, feels, code, condition });
+
+  if (NOTIF_TYPE === "morning") {
+    await sendToAll(
+      `${temp}° · Good Morning ☀️`,
+      `Feels ${feels}° · ${condition} · H:${high}° L:${low}°`
+    );
   }
 
-  const cities = groupByCity(devices);
-  console.log("Cities to process:", Object.keys(cities));
+  if (NOTIF_TYPE === "night") {
+    await sendToAll(
+      `${tomorrowHigh}° high tomorrow 🌙`,
+      `${getCondition(tomorrowCode)} overnight · Check your forecast`
+    );
+  }
 
-  for (const [cityName, info] of Object.entries(cities)) {
-    console.log("Processing city:", cityName);
+  if (NOTIF_TYPE === "severe") {
+    console.log("Checking severe:", { feels, temp, code });
 
-    const weather = await getWeather(info.lat, info.lon);
-    const temp      = Math.round(weather.current.temperature_2m);
-    const feels     = Math.round(weather.current.apparent_temperature);
-    const code      = weather.current.weather_code;
-    const condition = getCondition(code);
-    const high      = Math.round(weather.daily.temperature_2m_max[0]);
-    const low       = Math.round(weather.daily.temperature_2m_min[0]);
-    const tomorrowHigh = Math.round(weather.daily.temperature_2m_max[1]);
-    const tomorrowCode = weather.daily.weather_code[1];
-
-    if (NOTIF_TYPE === "morning") {
-      await sendNotification(
-        info.playerIds,
-        `${temp}° now`,
-        `in ${cityName}\nfeels ${feels}°\nH:${high}° L:${low}°`
+    if (feels >= 42) {
+      await sendToAll(
+        `🔥 Extreme Heat Alert`,
+        `Feels like ${feels}°. Stay hydrated. Avoid direct sun.`
       );
-    }
-
-    if (NOTIF_TYPE === "night") {
-      await sendNotification(
-        info.playerIds,
-        `${tomorrowHigh}° high tomorrow`,
-        `in ${cityName}\n${getCondition(tomorrowCode)} overnight`
+    } else if (temp <= 2) {
+      await sendToAll(
+        `🥶 Extreme Cold Alert`,
+        `${temp}° right now. Bundle up and stay warm.`
       );
-    }
-
-    if (NOTIF_TYPE === "severe") {
-      console.log("Checking severe conditions:", { feels, temp, code });
-
-      if (feels >= 42) {
-        await sendNotification(
-          info.playerIds,
-          `Extreme heat`,
-          `in ${cityName}\nFeels like ${feels}°. Stay hydrated.`
-        );
-      } else if (temp <= 2) {
-        await sendNotification(
-          info.playerIds,
-          `Extreme cold`,
-          `in ${cityName}\n${temp}° right now. Bundle up.`
-        );
-      } else if (code >= 95) {
-        await sendNotification(
-          info.playerIds,
-          `⛈ Severe storm`,
-          `in ${cityName}\nThunderstorm active. Stay indoors.`
-        );
-      } else {
-        console.log("No severe conditions detected.");
-      }
+    } else if (code >= 95) {
+      await sendToAll(
+        `⛈ Severe Storm Alert`,
+        `Thunderstorm conditions active. Stay indoors.`
+      );
+    } else {
+      console.log("No severe conditions. No notification sent.");
     }
   }
 
