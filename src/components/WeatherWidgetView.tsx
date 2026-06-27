@@ -78,7 +78,7 @@ export default function WeatherWidgetView({
   });
 
   const [useMLCorrection, setUseMLCorrection] = useState<boolean>(() => {
-    return settings.mlEnabled === true;
+    return settings.mlEnabled !== false;
   });
 
   const [copied, setCopied] = useState(false);
@@ -126,6 +126,33 @@ export default function WeatherWidgetView({
     navigator.clipboard.writeText(widgetUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAddShortcut = () => {
+    // 1. GoNative Android shortcut creation bridge
+    if (typeof window !== 'undefined' && (window as any).gonative) {
+      const encodedUrl = encodeURIComponent(widgetUrl);
+      const encodedTitle = encodeURIComponent(`${activeLocation.name} Widget`);
+      const encodedIcon = encodeURIComponent(window.location.origin + '/assest/icons/cloud-sun.svg');
+      window.location.href = `gonative://shortcuts/create?url=${encodedUrl}&title=${encodedTitle}&icon=${encodedIcon}`;
+      alert("Adding widget shortcut to home screen... Please check your launcher!");
+      return;
+    }
+
+    // 2. Standard PWA install prompt
+    if ((window as any).deferredPrompt) {
+      (window as any).deferredPrompt.prompt();
+      (window as any).deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted PWA installation');
+        }
+        (window as any).deferredPrompt = null;
+      });
+      return;
+    }
+
+    // 3. Fallback alert guiding the user
+    alert("To add this widget:\n\n1. If you are using the app, long-press your phone's home screen, select 'Widgets', find 'Overcast', and drag it onto your screen!\n\n2. If you are in a web browser, tap your browser's menu (three dots) and choose 'Add to Home Screen'.");
   };
 
   // Weather theme object helper
@@ -279,12 +306,12 @@ export default function WeatherWidgetView({
       // --- 2x2 Layout ---
       return (
         <div className="flex flex-col justify-between p-5 h-full relative z-10 text-left select-none gap-4">
-          <div className="flex items-start justify-between">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[15px] font-extrabold tracking-tight truncate max-w-[130px]">{activeLocation.name}</span>
-              <span className="text-[11px] opacity-75 font-medium">{activeLocation.country}</span>
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+              <span className="text-[15px] font-extrabold tracking-tight truncate">{activeLocation.name}</span>
+              <span className="text-[11px] opacity-75 font-medium truncate">{activeLocation.country}</span>
             </div>
-            <span className="text-[10px] opacity-50 font-bold uppercase tracking-widest mt-0.5">
+            <span className="text-[9px] opacity-55 font-bold uppercase tracking-wider mt-0.5 shrink-0">
               {new Intl.DateTimeFormat(settings.language || 'en', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}
             </span>
           </div>
@@ -413,7 +440,7 @@ export default function WeatherWidgetView({
       <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-app-text/[0.04] to-transparent pointer-events-none" />
 
       {/* Top Navbar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-app-bg/85 backdrop-blur-xl border-b border-app-border">
+      <header className="sticky top-0 z-50 flex items-center justify-between px-6 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1.2rem)] bg-app-bg/85 backdrop-blur-xl border-b border-app-border">
         <div className="flex items-center gap-3">
           <button 
             onClick={onClose}
@@ -510,7 +537,7 @@ export default function WeatherWidgetView({
 
             {/* Choose Size Layout */}
             <div className="flex flex-col gap-2.5 text-left">
-              <label className="text-[11px] font-black uppercase tracking-widest text-app-text-dim flex items-center gap-1.5">
+              <label className="text-[11px] font-black uppercase tracking-wide text-app-text-dim flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5" /> Widget Layout
               </label>
               <div className="grid grid-cols-3 gap-2.5">
@@ -519,7 +546,7 @@ export default function WeatherWidgetView({
                     key={l}
                     onClick={() => setLayout(l)}
                     className={cn(
-                      "py-3 px-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border",
+                      "py-3 px-2 rounded-2xl text-xs font-black uppercase tracking-normal transition-all border",
                       layout === l
                         ? "bg-app-text text-app-bg border-app-text shadow-sm"
                         : "bg-app-bg border-app-border text-app-text-dim hover:text-app-text"
@@ -533,7 +560,7 @@ export default function WeatherWidgetView({
 
             {/* Choose Style Theme */}
             <div className="flex flex-col gap-2.5 text-left">
-              <label className="text-[11px] font-black uppercase tracking-widest text-app-text-dim flex items-center gap-1.5">
+              <label className="text-[11px] font-black uppercase tracking-wide text-app-text-dim flex items-center gap-1.5">
                 <Palette className="w-3.5 h-3.5" /> Theme Style
               </label>
               <div className="grid grid-cols-3 gap-2.5">
@@ -542,7 +569,7 @@ export default function WeatherWidgetView({
                     key={t}
                     onClick={() => setTheme(t)}
                     className={cn(
-                      "py-3 px-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border",
+                      "py-3 px-2 rounded-2xl text-xs font-black uppercase tracking-normal transition-all border",
                       theme === t
                         ? "bg-app-text text-app-bg border-app-text shadow-sm"
                         : "bg-app-bg border-app-border text-app-text-dim hover:text-app-text"
@@ -563,9 +590,9 @@ export default function WeatherWidgetView({
               <button
                 onClick={() => setAnimations(!animations)}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all border",
+                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-normal transition-all border",
                   animations 
-                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" 
+                    ? "bg-emerald-600 text-white border-transparent shadow-sm" 
                     : "bg-app-bg border-app-border text-app-text-dim"
                 )}
               >
@@ -616,6 +643,16 @@ export default function WeatherWidgetView({
           
           <div className="bg-app-surface border border-app-border rounded-[32px] p-6 flex flex-col gap-6">
             
+            {/* Primary One-Click Shortcut Button */}
+            <button
+              onClick={handleAddShortcut}
+              className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[12px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+            >
+              <Sparkles className="w-4.5 h-4.5" /> Add Widget to Home Screen
+            </button>
+
+            <div className="border-t border-app-border pt-2" />
+
             <div className="flex flex-col gap-2">
               <span className="text-[13px] font-bold text-app-text flex items-center gap-1.5">
                 <span className="w-5 h-5 rounded-full bg-app-text text-app-bg flex items-center justify-center text-[10px] font-black">1</span>

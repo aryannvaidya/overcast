@@ -296,7 +296,7 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunri
       if (particles.current.length > 0) {
         const isRain = (weatherCode >= 51 && weatherCode <= 67) || (weatherCode >= 80 && weatherCode <= 82) || (weatherCode >= 95 && weatherCode <= 99);
         const isSnow = (weatherCode >= 71 && weatherCode <= 77) || weatherCode === 85 || weatherCode === 86;
-        const isCloudy = (weatherCode === 2 || weatherCode === 3 || (weatherCode >= 45 && code => 48));
+        const isCloudy = (weatherCode === 2 || weatherCode === 3 || (weatherCode >= 45 && weatherCode <= 48));
         const isClearDay = (weatherCode === 0 || weatherCode === 1) && !isNight;
 
         if (isRain) {

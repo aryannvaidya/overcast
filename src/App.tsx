@@ -60,6 +60,7 @@ const INITIAL_SETTINGS: Settings = {
   alertMorningSummary: false,
   alertNightSummary: false,
   backgroundGlow: 'on',
+  mlEnabled: true,
   layoutWeatherDetail: 'detailed',
   layoutHourlyForecast: 'detailed',
   layoutDailyForecast: 'detailed',
@@ -364,6 +365,7 @@ export default function App() {
         if (!parsed.unitPrecipitation) parsed.unitPrecipitation = 'mm';
         if (parsed.iconStyle === '3d') parsed.iconStyle = 'outline';
         if (parsed.iconStyle === 'coloured') parsed.iconStyle = 'animated_outline';
+        if (parsed.mlEnabled === undefined) parsed.mlEnabled = true;
         if (parsed.alertRain === undefined) parsed.alertRain = true;
         if (parsed.backgroundGlow === undefined) parsed.backgroundGlow = 'on';
         if (parsed.layoutWeatherDetail === undefined) parsed.layoutWeatherDetail = 'detailed';
@@ -487,6 +489,17 @@ export default function App() {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      (window as any).deferredPrompt = e;
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
 
   const refreshAQIForIndex = async (index: number) => {
     const locations = stateRef.current.locations;
@@ -3019,6 +3032,15 @@ export default function App() {
     <div 
       className="min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-text/20 transition-colors duration-500 relative"
     >
+      {activeWeather && (
+        <AtmosphereCanvas
+          weatherCode={activeWeather.current.weatherCode}
+          isNight={currentIsNight}
+          settings={state.settings}
+          sunriseISO={activeWeather.daily?.sunrise?.[0]}
+          sunsetISO={activeWeather.daily?.sunset?.[0]}
+        />
+      )}
       {/* Background is clean light theme */}
       <div 
         id="ui-overlay" 
