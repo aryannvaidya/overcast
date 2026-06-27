@@ -185,7 +185,7 @@ const safeSet = (key: string, value: string) => {
 // STEP 2 — NOTIFICATION SETTINGS STATE
 // ============================================================================
 export const NotifSettings = {
-  get enabled() { return safeGet("notif_enabled") === "true"; },
+  get enabled() { return safeGet("notif_enabled") !== "false"; },
   get morningEnabled() { return safeGet("notif_morning") === "true"; },
   get nightEnabled() { return safeGet("notif_night") === "true"; },
   get rainEnabled() { return safeGet("notif_rain") === "true"; },

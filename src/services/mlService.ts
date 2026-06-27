@@ -27,7 +27,7 @@ export interface MLModelStats {
 
 const HISTORY_KEY_PREFIX = 'app_ml_history_';
 const MODEL_KEY_PREFIX = 'app_ml_model_';
-const MAX_HISTORY_RECORDS = 200;
+const MAX_HISTORY_RECORDS = 500;
 
 function getHistoryKey(locationKey: string): string {
   return `${HISTORY_KEY_PREFIX}${locationKey}`;
@@ -90,8 +90,14 @@ export function getMLHistory(locationKey: string): MLHistoryRecord[] {
  */
 function solveWeightedLeastSquares(records: MLHistoryRecord[]): MLModelParams {
   const n = records.length;
-  if (n < 3) {
+  if (n < 5) {
     return { slope: 1.0, intercept: 0.0, samples: n };
+  }
+
+  // --- Outlier rejection: drop records where |actual - predicted| > 10°C ---
+  const filtered = records.filter(r => Math.abs(r.actual - r.predicted) <= 10);
+  if (filtered.length < 5) {
+    return { slope: 1.0, intercept: 0.0, samples: filtered.length };
   }
 
   let sumW = 0;
@@ -102,9 +108,9 @@ function solveWeightedLeastSquares(records: MLHistoryRecord[]): MLModelParams {
 
   const now = Date.now();
 
-  for (const r of records) {
+  for (const r of filtered) {
     const ageDays = (now - r.timestamp) / (1000 * 60 * 60 * 24);
-    const w = Math.exp(-ageDays / 7.0); // 7-day half-decay weight
+    const w = Math.exp(-ageDays / 14.0); // 14-day half-decay for stability
 
     const x = r.predicted;
     const y = r.actual;
@@ -122,9 +128,9 @@ function solveWeightedLeastSquares(records: MLHistoryRecord[]): MLModelParams {
   let num = 0;
   let den = 0;
 
-  for (const r of records) {
+  for (const r of filtered) {
     const ageDays = (now - r.timestamp) / (1000 * 60 * 60 * 24);
-    const w = Math.exp(-ageDays / 7.0);
+    const w = Math.exp(-ageDays / 14.0);
 
     const x = r.predicted;
     const y = r.actual;
@@ -141,13 +147,11 @@ function solveWeightedLeastSquares(records: MLHistoryRecord[]): MLModelParams {
     intercept = meanY - slope * meanX;
   }
 
-  // Bound slope/intercept to prevent distortions
-  if (slope < 0.6) slope = 0.6;
-  if (slope > 1.4) slope = 1.4;
-  if (intercept < -8) intercept = -8;
-  if (intercept > 8) intercept = 8;
+  // Tighter bounds — prevent wild corrections from skewing readings
+  slope = Math.max(0.75, Math.min(1.25, slope));
+  intercept = Math.max(-6, Math.min(6, intercept));
 
-  return { slope, intercept, samples: n };
+  return { slope, intercept, samples: filtered.length };
 }
 
 /**
@@ -168,8 +172,8 @@ export function trainLocalModel(locationKey: string): MLModelStats | null {
     const dayModel = solveWeightedLeastSquares(dayRecords);
     const nightModel = solveWeightedLeastSquares(nightRecords);
 
-    // Default stats if not enough data
-    if (n < 3) {
+    // Default stats if not enough data (require 5 samples before applying model)
+    if (n < 5) {
       return {
         samples: n,
         slope: 1.0,
@@ -270,15 +274,18 @@ export function getMLModelStats(locationKey: string): MLModelStats {
 export function calibrateTemperature(locationKey: string, rawTemp: number, isNight: boolean = false): number {
   const stats = getMLModelStats(locationKey);
   
-  // Use day/night specific model if it has enough samples
+  // Use day/night specific model if it has enough samples (min 5 for reliability)
   const model = isNight ? stats.nightModel : stats.dayModel;
-  if (model && model.samples >= 3) {
-    return model.slope * rawTemp + model.intercept;
+  if (model && model.samples >= 5) {
+    const corrected = model.slope * rawTemp + model.intercept;
+    // Hard sanity check: correction should never move temp more than 6°C
+    if (Math.abs(corrected - rawTemp) <= 6) return corrected;
   }
 
   // Fallback to overall model
-  if (stats.samples >= 3) {
-    return stats.slope * rawTemp + stats.intercept;
+  if (stats.samples >= 5) {
+    const corrected = stats.slope * rawTemp + stats.intercept;
+    if (Math.abs(corrected - rawTemp) <= 6) return corrected;
   }
 
   // Fallback to raw temperature

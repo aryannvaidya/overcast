@@ -57,7 +57,7 @@ const INITIAL_SETTINGS: Settings = {
   alertDaily: false,
   alertRealtime: false,
   timeFormat: '12h',
-  pushEnabled: false,
+  pushEnabled: true,
   alertMorningSummary: false,
   alertNightSummary: false,
   backgroundGlow: 'on',
@@ -361,8 +361,9 @@ export default function App() {
       const s = localStorage.getItem('app_settings');
       if (s) {
         const parsed = JSON.parse(s);
-        // Migration: Force light theme only
+        // Migration: Force light theme and enable push by default
         parsed.theme = 'light';
+        parsed.pushEnabled = true;
         if (!parsed.unitPrecipitation) parsed.unitPrecipitation = 'mm';
         if (parsed.iconStyle === '3d') parsed.iconStyle = 'outline';
         if (parsed.iconStyle === 'coloured') parsed.iconStyle = 'animated_outline';
