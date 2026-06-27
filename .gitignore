@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+/screenshots/
+/app-final.apk
+/*.apk
+/*.idsig
+
+

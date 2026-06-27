@@ -109,6 +109,7 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunri
   const particles = useRef<Particle[]>([]);
   const lastWeatherState = useRef<{ code: number; night: boolean } | null>(null);
   const lightningFlash = useRef<number>(0); // opacity offset of lightning
+  const sunRotation = useRef<number>(0);
 
   useEffect(() => {
     // Prime values
@@ -140,9 +141,66 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunri
     handleResize();
     window.addEventListener('resize', handleResize);
 
-    // Weather particles creator (disabled to ensure zero CPU overhead and lag-free transitions)
-    const initParticles = (code: number, night: boolean) => {
+    // Weather particles creator
+    const initParticles = (code: number, night: boolean, width: number, height: number) => {
       particles.current = [];
+      
+      const isRain = (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99);
+      const isSnow = (code >= 71 && code <= 77) || code === 85 || code === 86;
+      const isCloudy = (code === 2 || code === 3 || (code >= 45 && code <= 48));
+      const isClearDay = (code === 0 || code === 1) && !night;
+
+      if (isRain) {
+        const count = 40;
+        for (let i = 0; i < count; i++) {
+          particles.current.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: 1.0 + Math.random() * 0.8, // wind slant
+            vy: 7 + Math.random() * 4,
+            size: 0.8 + Math.random() * 0.8, // thin lines
+            opacity: 0.04 + Math.random() * 0.08,
+            extra: 15 + Math.random() * 10 // rain length
+          });
+        }
+      } else if (isSnow) {
+        const count = 25;
+        for (let i = 0; i < count; i++) {
+          particles.current.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: -0.2 + Math.random() * 0.4,
+            vy: 0.4 + Math.random() * 0.5,
+            size: 1.2 + Math.random() * 2.2,
+            opacity: 0.08 + Math.random() * 0.14,
+            extra: Math.random() * Math.PI * 2 // wobble phase
+          });
+        }
+      } else if (isCloudy) {
+        const count = 3;
+        for (let i = 0; i < count; i++) {
+          particles.current.push({
+            x: Math.random() * width,
+            y: 50 + Math.random() * (height - 150),
+            vx: 0.03 + Math.random() * 0.04,
+            vy: 0,
+            size: 110 + Math.random() * 70, // mist puff size
+            opacity: 0.02 + Math.random() * 0.025
+          });
+        }
+      } else if (isClearDay) {
+        const count = 10;
+        for (let i = 0; i < count; i++) {
+          particles.current.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: -0.04 + Math.random() * 0.08,
+            vy: -0.04 + Math.random() * 0.08,
+            size: 1.0 + Math.random() * 1.5,
+            opacity: 0.05 + Math.random() * 0.08
+          });
+        }
+      }
     };
 
     // Main animation ticking loop
@@ -191,11 +249,8 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunri
       const stateKey = lastWeatherState.current;
       if (!stateKey || stateKey.code !== weatherCode || stateKey.night !== isNight) {
         lastWeatherState.current = { code: weatherCode, night: isNight };
-        initParticles(weatherCode, isNight);
+        initParticles(weatherCode, isNight, w, h);
       }
-
-      // Manage random lightning flash in severe thunderstorms - disabled to avoid screen blinking
-      lightningFlash.current = 0;
 
       // 2. Clear & paint the custom hardware accelerated gradient
       ctx.clearRect(0, 0, w, h);
@@ -216,7 +271,128 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunri
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
-      // 3. Update & render particles (Particle rendering disabled for maximum performance)
+      // 3. Clear Day Sunbeams (Slow rotating light rays)
+      if ((weatherCode === 0 || weatherCode === 1) && !isNight) {
+        sunRotation.current += 0.0012; // slow, premium rotation speed
+        ctx.save();
+        ctx.translate(w / 2, 180);
+        ctx.rotate(sunRotation.current);
+        const beams = 8;
+        ctx.fillStyle = 'rgba(255, 245, 210, 0.015)'; // extremely faint warm glow
+        for (let i = 0; i < beams; i++) {
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          const angleStart = (i * Math.PI * 2) / beams;
+          const angleEnd = angleStart + 0.25; // beam width
+          ctx.lineTo(Math.cos(angleStart) * 600, Math.sin(angleStart) * 600);
+          ctx.lineTo(Math.cos(angleEnd) * 600, Math.sin(angleEnd) * 600);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // 4. Update & render particles
+      if (particles.current.length > 0) {
+        const isRain = (weatherCode >= 51 && weatherCode <= 67) || (weatherCode >= 80 && weatherCode <= 82) || (weatherCode >= 95 && weatherCode <= 99);
+        const isSnow = (weatherCode >= 71 && weatherCode <= 77) || weatherCode === 85 || weatherCode === 86;
+        const isCloudy = (weatherCode === 2 || weatherCode === 3 || (weatherCode >= 45 && code => 48));
+        const isClearDay = (weatherCode === 0 || weatherCode === 1) && !isNight;
+
+        if (isRain) {
+          ctx.lineCap = 'round';
+          particles.current.forEach(p => {
+            ctx.lineWidth = p.size;
+            ctx.strokeStyle = `rgba(156, 180, 255, ${p.opacity})`;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x + p.vx * 1.5, p.y + (p.extra || 20));
+            ctx.stroke();
+
+            // Update
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Reset boundary
+            if (p.y > h || p.x > w) {
+              p.y = -20;
+              p.x = Math.random() * w;
+            }
+          });
+        } else if (isSnow) {
+          particles.current.forEach(p => {
+            ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Update wobble & motion
+            if (p.extra !== undefined) {
+              p.extra += 0.015; // phase step
+              p.x += p.vx + Math.sin(p.extra) * 0.3;
+            }
+            p.y += p.vy;
+
+            // Reset boundary
+            if (p.y > h) {
+              p.y = -10;
+              p.x = Math.random() * w;
+              if (p.extra !== undefined) p.extra = Math.random() * Math.PI * 2;
+            }
+          });
+        } else if (isCloudy) {
+          particles.current.forEach(p => {
+            const cloudGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+            cloudGrad.addColorStop(0, `rgba(255, 255, 255, ${p.opacity})`);
+            cloudGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = cloudGrad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Slow drift
+            p.x += p.vx;
+            if (p.x - p.size > w) {
+              p.x = -p.size;
+              p.y = 50 + Math.random() * (h - 150);
+            }
+          });
+        } else if (isClearDay) {
+          particles.current.forEach(p => {
+            ctx.fillStyle = `rgba(255, 255, 205, ${p.opacity})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Floating dust
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Boundary
+            if (p.y > h || p.y < 0 || p.x > w || p.x < 0) {
+              p.x = Math.random() * w;
+              p.y = Math.random() * h;
+            }
+          });
+        }
+      }
+
+      // 5. Thunderstorm Lightning flashes
+      if (weatherCode >= 95 && weatherCode <= 99) {
+        if (lightningFlash.current > 0) {
+          lightningFlash.current -= 0.045; // fade out
+        } else if (Math.random() < 0.002) { // rare organic lightning
+          lightningFlash.current = 0.12; // soft peak opacity
+        }
+
+        if (lightningFlash.current > 0) {
+          ctx.fillStyle = `rgba(228, 235, 255, ${lightningFlash.current})`;
+          ctx.fillRect(0, 0, w, h);
+        }
+      } else {
+        lightningFlash.current = 0;
+      }
 
       animationFrameId.current = requestAnimationFrame(tick);
     };
