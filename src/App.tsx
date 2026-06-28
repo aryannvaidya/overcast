@@ -19,6 +19,7 @@ import CityManager from './components/CityManager';
 import WeatherRadarMap from './components/WeatherRadarMap';
 import AlertsDisplay from './components/AlertsDisplay';
 import AtmosphereCanvas from './components/AtmosphereCanvas';
+import { calibrateTemperature } from './services/mlService';
 import { Haptic } from './lib/haptics';
 import { format } from 'date-fns';
 import { Translate, fetchDynamicTranslation } from './lib/translations';
@@ -28,7 +29,9 @@ import {
   applyNotifToggleStates,
   SafeNotif,
   safeOneSignal,
-  tagDeviceLocation
+  tagDeviceLocation,
+  sendNotification,
+  syncUserSettingsToFirebase
 } from './services/oneSignalService';
 
 const DEFAULT_LOCATION: Location | null = null;
@@ -53,10 +56,11 @@ const INITIAL_SETTINGS: Settings = {
   alertDaily: false,
   alertRealtime: false,
   timeFormat: '12h',
-  pushEnabled: false,
+  pushEnabled: true,
   alertMorningSummary: false,
   alertNightSummary: false,
   backgroundGlow: 'on',
+  mlEnabled: true,
   layoutWeatherDetail: 'detailed',
   layoutHourlyForecast: 'detailed',
   layoutDailyForecast: 'compact',
@@ -321,13 +325,15 @@ export default function App() {
       const s = localStorage.getItem('app_settings');
       if (s) {
         const parsed = JSON.parse(s);
-        // Migration: Force light theme only
+        // Migration: Force light theme and enable push by default
         parsed.theme = 'light';
         if (parsed.colorTheme === undefined) parsed.colorTheme = 'blue';
+        parsed.pushEnabled = true;
         if (!parsed.unitPrecipitation) parsed.unitPrecipitation = 'mm';
         if (!parsed.iconStyle) parsed.iconStyle = 'animated';
         if (parsed.iconStyle === '3d') parsed.iconStyle = 'outline';
         if (parsed.iconStyle === 'coloured') parsed.iconStyle = 'animated_outline';
+        if (parsed.mlEnabled === undefined) parsed.mlEnabled = true;
         if (parsed.alertRain === undefined) parsed.alertRain = true;
         if (parsed.backgroundGlow === undefined) parsed.backgroundGlow = 'on';
         if (parsed.layoutWeatherDetail === undefined) parsed.layoutWeatherDetail = 'detailed';
@@ -448,9 +454,35 @@ export default function App() {
   });
 
   const stateRef = useRef(state);
+  const lastNotifiedCityRef = useRef<string>('');
+
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Track current URL path for in-app routing without full page reloads
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      (window as any).deferredPrompt = e;
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
 
   const refreshAQIForIndex = async (index: number) => {
     const locations = stateRef.current.locations;
@@ -592,6 +624,52 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
+
+  // Bridge active location to Android SharedPreferences, sync to Firebase, and trigger travel notifications.
+  useEffect(() => {
+    const city = state.locations[state.activeLocationIndex];
+    const weather = state.weatherData[state.activeLocationIndex];
+    if (city) {
+      const bridge = (window as any).AndroidBridge;
+      if (bridge && typeof bridge.saveLocation === 'function') {
+        try {
+          console.log('[AndroidBridge] Syncing location for widget:', city.name);
+          bridge.saveLocation(city.name, city.latitude, city.longitude);
+        } catch (e) {
+          console.warn('[AndroidBridge] Failed to call saveLocation:', e);
+        }
+      }
+
+      // Sync settings & location to Firebase if playerId is available
+      if (state.settings.oneSignalPlayerId) {
+        syncUserSettingsToFirebase(state.settings.oneSignalPlayerId, state.settings, city);
+      }
+
+      // Trigger location-based travel alerts
+      if (weather && lastNotifiedCityRef.current !== city.name) {
+        lastNotifiedCityRef.current = city.name;
+        
+        const temp = Math.round(weather.current.temperature);
+        const code = weather.current.weatherCode;
+        const isRainy = code >= 51;
+
+        let title = `Heading to ${city.name}? 🎒`;
+        let body = '';
+
+        if (isRainy) {
+          body = `It's rainy today in ${city.name} (${temp}°C). Don't forget to bring an umbrella! ☔🌧️`;
+        } else if (temp >= 28) {
+          body = `It's warm and sunny in ${city.name} (${temp}°C). Perfect day for sunglasses and sunscreen! 🕶️☀️`;
+        } else if (temp <= 15) {
+          body = `It's chilly in ${city.name} (${temp}°C). Make sure to wear a jacket! 🧥❄️`;
+        } else {
+          body = `Nice weather in ${city.name} today (${temp}°C). Enjoy your trip! 🚗✨`;
+        }
+
+        sendNotification(title, body);
+      }
+    }
+  }, [state.activeLocationIndex, state.locations, state.weatherData, state.settings.oneSignalPlayerId]);
 
   // ALSO REFRESH AQI ON CITY SWITCH (if older than 30 min OR never fetched)
   useEffect(() => {
@@ -944,6 +1022,28 @@ export default function App() {
       
       console.log("Current location replaced successfully:", cityName);
       tagDeviceLocation(cityName, lat, lon);
+
+      // Trigger outdoor walking smart alert if push notifications are enabled
+      if (NotifSettings.enabled) {
+        try {
+          const temp = Math.round(data.current?.temperature ?? 0);
+          const weatherCode = data.current?.weatherCode ?? 0;
+          const conditionLabel = getWeatherInfo(weatherCode, data.current?.isDay !== false).label.toLowerCase();
+          const rainProb = data.hourly?.precipitationProbability?.[0] ?? 0;
+          
+          let alertBody = `Now at ${cityName}: ${temp}°C and ${conditionLabel}.`;
+          if (rainProb >= 40) {
+            alertBody += ` 🌧️ Rain is possible (${rainProb}% chance). Grab an umbrella!`;
+          } else {
+            alertBody += ` Clear conditions. Perfect for walking!`;
+          }
+          
+          sendNotification(`🚶 Smart Outdoor Weather Update`, alertBody);
+        } catch (e) {
+          console.warn("Failed sending walking notification:", e);
+        }
+      }
+
       return true;
     } catch (err) {
       console.warn("fetchWeather failed when replacing current location page, keeping previous city:", err);
@@ -2190,8 +2290,44 @@ export default function App() {
     }
   }, [state.activeLocationIndex, state.locations]);
 
-  const activeWeather = state.weatherData[state.activeLocationIndex];
+  const rawActiveWeather = state.weatherData[state.activeLocationIndex];
   const activeLocation = state.locations[state.activeLocationIndex];
+
+  // Dynamically calibrate activeWeather on-the-fly using our ML model if enabled
+  const activeWeather = React.useMemo(() => {
+    if (!rawActiveWeather || !state.settings.mlEnabled || !activeLocation) {
+      return rawActiveWeather;
+    }
+    const cityKey = getCityKey(activeLocation);
+    const riseTime = rawActiveWeather.daily?.sunrise?.[0];
+    const setTime = rawActiveWeather.daily?.sunset?.[0];
+    const currentIsNight = rawActiveWeather.current?.isDay === 0;
+
+    return {
+      ...rawActiveWeather,
+      current: {
+        ...rawActiveWeather.current,
+        temperature: calibrateTemperature(cityKey, rawActiveWeather.current.temperature, currentIsNight),
+        apparentTemperature: calibrateTemperature(cityKey, rawActiveWeather.current.apparentTemperature, currentIsNight),
+      },
+      hourly: {
+        ...rawActiveWeather.hourly,
+        temperature: rawActiveWeather.hourly.temperature.map((t, idx) => {
+          const isNight = isNightHour(rawActiveWeather.hourly.time[idx], riseTime, setTime);
+          return calibrateTemperature(cityKey, t, isNight);
+        }),
+        temperature_2m: rawActiveWeather.hourly.temperature_2m?.map((t, idx) => {
+          const isNight = isNightHour(rawActiveWeather.hourly.time[idx], riseTime, setTime);
+          return calibrateTemperature(cityKey, t, isNight);
+        }) || [],
+      },
+      daily: {
+        ...rawActiveWeather.daily,
+        temperatureMax: rawActiveWeather.daily.temperatureMax.map(t => calibrateTemperature(cityKey, t, false)), // Day max
+        temperatureMin: rawActiveWeather.daily.temperatureMin.map(t => calibrateTemperature(cityKey, t, true)),  // Night min
+      }
+    };
+  }, [rawActiveWeather, state.settings.mlEnabled, activeLocation]);
 
   // Sync background weather gradient on active location/weather data change
   useEffect(() => {
@@ -2952,8 +3088,6 @@ export default function App() {
     currentSunrise,
     currentSunset
   ) : false;
-
-  const currentThemeColor = getWeatherThemeColor(currentCode, !currentIsNight);
 
   return (
     <div 

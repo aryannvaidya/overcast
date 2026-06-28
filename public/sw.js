@@ -1,4 +1,4 @@
-const CACHE = "nimbus-v1";
+const CACHE = "nimbus-v2";
 const ASSETS = [
   "/",
   "/index.html",
@@ -25,11 +25,6 @@ const ASSETS = [
   "/assest/static/snowy-4.svg",
   "/assest/static/snowy-5.svg",
   "/assest/static/snowy-6.svg",
-  "/assest/static/thunder.svg",
-  "/assest/static/weather-sprite.svg",
-  "/assest/static/weather.svg",
-  "/assest/static/weather_sagittarius.svg",
-  "/assest/static/weather_sunset.svg",
   "/assest/animated/day.svg",
   "/assest/animated/night.svg",
   "/assest/animated/cloudy-day-1.svg",
@@ -144,6 +139,26 @@ self.addEventListener("fetch", e => {
   e.respondWith(
     caches.match(e.request)
       .then(cached => cached || fetch(e.request))
+  // App shell — Network first, falling back to cache
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        // Cache local origin files or fonts on the fly
+        if (url.origin === location.origin || url.hostname.includes("fonts.googleapis.com") || url.hostname.includes("fonts.gstatic.com")) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      })
+      .catch(() => {
+        return caches.match(e.request).then(cached => {
+          if (cached) return cached;
+          if (e.request.mode === "navigate" || (e.request.headers.get("accept") && e.request.headers.get("accept").includes("text/html"))) {
+            return caches.match("/index.html");
+          }
+          return new Response("Resource offline", { status: 503, statusText: "Offline" });
+        });
+      })
   );
 });
 
@@ -169,5 +184,45 @@ self.addEventListener("message", e => {
       });
     });
   }
+});
+
+// --- PWA WIDGET EVENTS SUPPORT ---
+self.addEventListener("widgetinstall", e => {
+  console.log("[SW] Widget installed:", e.widget);
+  e.waitUntil(
+    // Prefetch cached weather data for the active city
+    caches.open(CACHE).then(cache => {
+      return cache.addAll([
+        "/index.html",
+        "/manifest.json"
+      ]);
+    })
+  );
+});
+
+self.addEventListener("widgetuninstall", e => {
+  console.log("[SW] Widget uninstalled:", e.widget);
+});
+
+self.addEventListener("widgetresume", e => {
+  console.log("[SW] Widget resumed, updating payload:", e.widget);
+  // Optional: trigger widget payload refresh
+});
+
+self.addEventListener("widgetclick", e => {
+  console.log("[SW] Widget click action received:", e.action, e.widget);
+  e.waitUntil(
+    self.clients.matchAll({ type: "window" }).then(clients => {
+      // Direct clicks open/navigate to the app main window
+      for (const client of clients) {
+        if (client.url === "/" && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("/");
+      }
+    })
+  );
 });
 

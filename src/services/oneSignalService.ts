@@ -47,6 +47,18 @@ export const tagDeviceLocation = (cityName: string, lat: number, lon: number) =>
       }
     });
   }
+
+  safeOneSignal(async (OneSignal: any) => {
+    try {
+      if (OneSignal.User?.addTag) {
+        await OneSignal.User.addTag("city", cityName);
+        await OneSignal.User.addTag("lat", lat.toString());
+        await OneSignal.User.addTag("lon", lon.toString());
+      }
+    } catch (e) {
+      console.warn("Failed to set OneSignal web location tags:", e);
+    }
+  });
 };
 
 // ============================================================================
@@ -193,7 +205,7 @@ const safeSet = (key: string, value: string) => {
 // STEP 2 — NOTIFICATION SETTINGS STATE
 // ============================================================================
 export const NotifSettings = {
-  get enabled() { return safeGet("notif_enabled") === "true"; },
+  get enabled() { return safeGet("notif_enabled") !== "false"; },
   get morningEnabled() { return safeGet("notif_morning") === "true"; },
   get nightEnabled() { return safeGet("notif_night") === "true"; },
   get rainEnabled() { return safeGet("notif_rain") === "true"; },
@@ -248,6 +260,21 @@ export const applyNotifToggleStates = () => {
 // ============================================================================
 export const wirePushToggle = async (enabled: boolean, showToast?: (msg: string) => void) => {
   NotifSettings.save("enabled", enabled);
+
+  if (enabled && typeof window !== 'undefined' && (window as any).gonative) {
+    const gonative = (window as any).gonative;
+    try {
+      if (gonative.notifications?.register) {
+        gonative.notifications.register();
+      } else if (gonative.nativebridge?.custom) {
+        gonative.nativebridge.custom('gonative://notifications/register');
+      } else {
+        window.location.href = 'gonative://notifications/register';
+      }
+    } catch (e) {
+      console.warn("GoNative notifications registration call failed:", e);
+    }
+  }
 
   safeOneSignal(async (OneSignal: any) => {
     try {
@@ -488,6 +515,21 @@ export async function initializeOneSignal(onSubscriptionChange?: (playerId: stri
 }
 
 export async function requestNotificationPermission(): Promise<string | null> {
+  if (typeof window !== 'undefined' && (window as any).gonative) {
+    const gonative = (window as any).gonative;
+    try {
+      if (gonative.notifications?.register) {
+        gonative.notifications.register();
+      } else if (gonative.nativebridge?.custom) {
+        gonative.nativebridge.custom('gonative://notifications/register');
+      } else {
+        window.location.href = 'gonative://notifications/register';
+      }
+    } catch (e) {
+      console.warn("GoNative notifications registration call failed:", e);
+    }
+  }
+
   return new Promise((resolve) => {
     try {
       safeOneSignal(async (OneSignal: any) => {
@@ -619,3 +661,20 @@ export async function fetchUserSettingsFromFirebase(
     return null;
   }
 }
+
+export const sendSmartWelcomeNotification = (cityName: string, weatherData: any) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const temp = Math.round(weatherData?.current?.temperature ?? 25);
+    const code = weatherData?.current?.weatherCode ?? 0;
+    const isDay = weatherData?.current?.isDay !== false;
+    const cond = getWeatherInfo(code, isDay).label.toLowerCase();
+    
+    sendNotification(
+      `🔔 Nimbus Smart Alerts Active`,
+      `Currently tracking weather at ${cityName} (${temp}°C, ${cond}). We will alert you immediately if rain is coming or storm conditions develop.`
+    );
+  } catch (err) {
+    console.warn("Failed sending welcome notification:", err);
+  }
+};
