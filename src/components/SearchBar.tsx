@@ -249,7 +249,7 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled, lang = 'en
                           setIsLoading(false);
                           setGeoError("Location access is denied");
                         }
-                      }, 5500);
+                      }, 12000);
 
                       navigator.geolocation.getCurrentPosition(
                         async (pos) => {
@@ -299,7 +299,7 @@ export default function SearchBar({ onSelect, onClose, hapticEnabled, lang = 'en
                           setIsLoading(false);
                           setGeoError("Location access is denied");
                         },
-                        { timeout: 8000, enableHighAccuracy: true }
+                        { timeout: 10000, enableHighAccuracy: true }
                       );
                     } else {
                       setIsLoading(false);

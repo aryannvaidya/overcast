@@ -83,8 +83,8 @@ export function UpcomingRainGraph({ weather, settings }: UpcomingRainGraphProps)
   }
 
   return (
-    <div className="flex flex-col px-0 -mx-[21px] md:-mx-[21px] animate-fade-in">
-      <div className="w-full max-w-[335px] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] py-5 px-6 flex flex-col gap-4 overflow-hidden shadow-2xl relative select-none">
+    <div className="flex flex-col px-0 -mx-[1rem] sm:-mx-[1.3125rem] animate-fade-in">
+      <div className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative select-none">
         
         {/* Top Header Section matched structurally with the AQI style */}
         <div className="flex items-center justify-between">

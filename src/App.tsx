@@ -24,8 +24,6 @@ import { format } from 'date-fns';
 import { Translate, fetchDynamicTranslation } from './lib/translations';
 import { 
   NotifSettings, 
-  scheduleMorningSummary, 
-  scheduleNightSummary, 
   checkWeatherAlerts, 
   applyNotifToggleStates,
   SafeNotif,
@@ -41,8 +39,9 @@ const INITIAL_SETTINGS: Settings = {
   unitPressure: 'mmHg',
   unitVisibility: 'km',
   unitPrecipitation: 'mm',
-  iconStyle: 'animated_outline',
+  iconStyle: 'animated',
   theme: 'light',
+  colorTheme: 'blue',
   hapticEnabled: true,
   notificationTime: '08:00',
   rainThreshold: 30,
@@ -60,7 +59,7 @@ const INITIAL_SETTINGS: Settings = {
   backgroundGlow: 'on',
   layoutWeatherDetail: 'detailed',
   layoutHourlyForecast: 'detailed',
-  layoutDailyForecast: 'detailed',
+  layoutDailyForecast: 'compact',
   enabledTiles: {
     aqi: true,
     uv: true,
@@ -80,10 +79,10 @@ const INITIAL_SETTINGS: Settings = {
     'forecast',
     'aqi',
     'uv',
-    'sunMoon',
+    'pollen',
     'humidityVisibility',
     'precipitationWind',
-    'pollen'
+    'sunMoon'
   ]
 };
 
@@ -136,27 +135,11 @@ const lastAQIFetch: Record<string, number> = {};
 
 // Fast switching & tap helpers
 const pauseAnimationsOnCard = (cardEl: HTMLElement) => {
-  cardEl.querySelectorAll(
-    "[class*='animate'], " +
-    "[class*='particle'], " +
-    "[class*='atmosphere'], " +
-    "[class*='weather-fx']"
-  ).forEach(el => {
-    (el as HTMLElement).style.animationPlayState = "paused";
-    (el as HTMLElement).style.willChange = "auto";
-  });
+  // Purely CSS-driven animation state avoids forced synchronous layout reflows!
 };
 
 const resumeAnimationsOnCard = (cardEl: HTMLElement) => {
-  cardEl.querySelectorAll(
-    "[class*='animate'], " +
-    "[class*='particle'], " +
-    "[class*='atmosphere'], " +
-    "[class*='weather-fx']"
-  ).forEach(el => {
-    (el as HTMLElement).style.animationPlayState = "running";
-    (el as HTMLElement).style.willChange = "transform, opacity";
-  });
+  // Purely CSS-driven animation state avoids forced synchronous layout reflows!
 };
 
 // Single source of truth for animation state
@@ -168,9 +151,6 @@ const killAnimations = () => {
     document.documentElement.style.setProperty("--animation-state", "paused");
     document.body.setAttribute("data-animations", "off");
     document.body.classList.add("no-animations");
-    document.querySelectorAll(".city-card, .atmosphere").forEach(card => {
-      pauseAnimationsOnCard(card as HTMLElement);
-    });
   }
 };
 
@@ -180,22 +160,6 @@ const enableAnimations = () => {
     document.documentElement.style.setProperty("--animation-state", "running");
     document.body.setAttribute("data-animations", "on");
     document.body.classList.remove("no-animations");
-    document.querySelectorAll(
-      "[class*='animate'], " +
-      "[class*='particle'], " +
-      "[class*='atmosphere']"
-    ).forEach(el => {
-      (el as HTMLElement).style.animationPlayState = "running";
-    });
-    // Resume only active card after render
-    const activeCard = document.querySelector("#swipe-layer") as HTMLElement;
-    if (activeCard) {
-      resumeAnimationsOnCard(activeCard);
-    }
-    const atmosphere = document.querySelector(".atmosphere") as HTMLElement;
-    if (atmosphere) {
-      resumeAnimationsOnCard(atmosphere);
-    }
   }
 };
 
@@ -359,14 +323,16 @@ export default function App() {
         const parsed = JSON.parse(s);
         // Migration: Force light theme only
         parsed.theme = 'light';
+        if (parsed.colorTheme === undefined) parsed.colorTheme = 'blue';
         if (!parsed.unitPrecipitation) parsed.unitPrecipitation = 'mm';
+        if (!parsed.iconStyle) parsed.iconStyle = 'animated';
         if (parsed.iconStyle === '3d') parsed.iconStyle = 'outline';
         if (parsed.iconStyle === 'coloured') parsed.iconStyle = 'animated_outline';
         if (parsed.alertRain === undefined) parsed.alertRain = true;
         if (parsed.backgroundGlow === undefined) parsed.backgroundGlow = 'on';
         if (parsed.layoutWeatherDetail === undefined) parsed.layoutWeatherDetail = 'detailed';
         if (parsed.layoutHourlyForecast === undefined) parsed.layoutHourlyForecast = 'detailed';
-        if (parsed.layoutDailyForecast === undefined) parsed.layoutDailyForecast = 'detailed';
+        if (parsed.layoutDailyForecast === undefined) parsed.layoutDailyForecast = 'compact';
         if (!parsed.enabledTiles) {
           parsed.enabledTiles = {
             aqi: true,
@@ -396,10 +362,10 @@ export default function App() {
             'forecast',
             'aqi',
             'uv',
-            'sunMoon',
+            'pollen',
             'humidityVisibility',
             'precipitationWind',
-            'pollen'
+            'sunMoon'
           ];
         }
         cachedSettings = parsed;
@@ -1111,15 +1077,15 @@ export default function App() {
     return new Promise<{ lat: number; lon: number; cityName: string } | null>((resolve) => {
       let resolvedOrFailed = false;
 
-      // Set a backup timeout: if standard GPS takes > 4 seconds, fallback to IP Geolocation immediately!
+      // Set a backup timeout: if standard GPS takes > 12 seconds, fallback to IP Geolocation immediately!
       const gpsTimeoutToken = setTimeout(async () => {
         if (!resolvedOrFailed) {
           resolvedOrFailed = true;
-          console.warn("GPS request taking too long (>4s). Falling back to IP Geolocation.");
+          console.warn("GPS request taking too long (>12s). Falling back to IP Geolocation.");
           const res = await runIpFallback();
           resolve(res);
         }
-      }, 4000);
+      }, 12000);
 
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -1220,9 +1186,9 @@ export default function App() {
           }
         },
         {
-          enableHighAccuracy: false,
-          timeout: 8000,
-          maximumAge: 300000
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000
         }
       );
     });
@@ -1583,6 +1549,10 @@ export default function App() {
         error: null
       }));
 
+      if (index === state.activeLocationIndex) {
+        tagDeviceLocation(location.name, location.latitude, location.longitude);
+      }
+
       // Hide skeleton and restore animations instantly
       hideCitySkeleton();
       enableAllAnimations();
@@ -1601,6 +1571,10 @@ export default function App() {
     try {
       const data = await fetchWeather(location.latitude, location.longitude, location.timezone, location.name, location.country);
       saveWeatherData(cityKey, data);
+      
+      if (index === state.activeLocationIndex) {
+        tagDeviceLocation(location.name, location.latitude, location.longitude);
+      }
       
       // Check weather alerts with OneSignal on every refresh/fetch
       checkWeatherAlerts(data, location.name);
@@ -1807,6 +1781,8 @@ export default function App() {
         error: null
       }));
 
+      tagDeviceLocation(city.name, city.latitude, city.longitude);
+
       // Apply weather gradient smoothly based on Cache data
       const riseTime = cached.data.daily?.sunrise?.[0];
       const setTime = cached.data.daily?.sunset?.[0];
@@ -1839,6 +1815,8 @@ export default function App() {
           loading: false,
           error: null
         }));
+
+        tagDeviceLocation(city.name, city.latitude, city.longitude);
 
         const riseTime = fresh.daily?.sunrise?.[0];
         const setTime = fresh.daily?.sunset?.[0];
@@ -2076,6 +2054,12 @@ export default function App() {
     localStorage.setItem('app_active_index', state.activeLocationIndex.toString());
   }, [state.settings, state.locations, state.activeLocationIndex]);
 
+  const currentCityKey = state.locations[state.activeLocationIndex]?.id ?? state.activeLocationIndex;
+  useEffect(() => {
+    (window as any).lastCitySwitchTime = Date.now();
+    window.dispatchEvent(new CustomEvent('city-switch'));
+  }, [currentCityKey]);
+
   // Proactively pre-translate all city names and all settings keys/descriptions whenever locations or selected language changes
   useEffect(() => {
     const lang = state.settings.language || 'en';
@@ -2142,6 +2126,28 @@ export default function App() {
       fetchDynamicTranslation(str, lang);
     });
   }, [state.locations, state.settings.language]);
+
+  // Fire median_app_loaded and remove inline HTML loading screen when App is ready
+  const hasFiredLoadedEventRef = useRef(false);
+  useEffect(() => {
+    if (!hasFiredLoadedEventRef.current && (!state.loading || state.locations.length === 0)) {
+      hasFiredLoadedEventRef.current = true;
+      
+      // Remove loading screen
+      const el = document.getElementById('app-loading-screen');
+      if (el) {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.25s ease-out';
+        setTimeout(() => el.remove(), 250);
+      } else {
+        // Fallback if elements don't exist yet but events must fire
+      }
+      
+      // Dispatch Median loaded event
+      console.log('[Median Bridge] App is ready. Dispatching median_app_loaded event.');
+      window.dispatchEvent(new CustomEvent('median_app_loaded'));
+    }
+  }, [state.loading, state.locations.length]);
 
   // Service Worker pre-fetching strategy for adjacent cities in the swipe sequence
   useEffect(() => {
@@ -2224,28 +2230,7 @@ export default function App() {
 
     Haptic.warning(state.settings.hapticEnabled);
 
-    // Try to trigger via OneSignal REST API using the subscription/playerId
-    try {
-      const playerId = state.settings.oneSignalPlayerId || localStorage.getItem("onesignal_player_id") || (window as any).OneSignal?.User?.PushSubscription?.id;
-      if (playerId) {
-        fetch("https://onesignal.com/api/v1/notifications", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            app_id: "d78d4db3-2898-4f81-8bba-c8b5b719ee1b",
-            include_subscription_ids: [playerId],
-            headings: { en: title },
-            contents: { en: body }
-          })
-        }).catch(err => console.warn("OneSignal server push failed:", err));
-      }
-    } catch (err) {
-      console.warn("OneSignal endpoint call failed:", err);
-    }
-
-    // Always trigger native local/service-worker display so it shows within the device instantly
+    // Always trigger native local/service-worker display so it shows within the device instantly (no failing REST API endpoint call)
     await SafeNotif.send(title, body, icon);
   };
 
@@ -2479,14 +2464,8 @@ export default function App() {
       console.warn("history initialization failed:", e);
     }
 
-    // Initialize notification states and startup alert schedulers
+    // Initialize notification states
     applyNotifToggleStates();
-    if (NotifSettings.morningEnabled) {
-      scheduleMorningSummary();
-    }
-    if (NotifSettings.nightEnabled) {
-      scheduleNightSummary();
-    }
 
     let backPressCount = 0;
     let toastTimer: any = null;
@@ -2836,66 +2815,76 @@ export default function App() {
           />
           
           <div className="flex flex-col gap-4">
-            {!isAnyModalOpen && (state.settings.tileOrder || [
-              'rainGraph',
-              'forecast',
-              'aqi',
-              'uv',
-              'sunMoon',
-              'humidityVisibility',
-              'precipitationWind',
-              'pollen'
-            ]).map(id => {
-              if (id === 'rainGraph') {
-                return (
-                  <React.Fragment key="rainGraph">
-                    <UpcomingRainGraph 
-                      weather={activeWeather} 
-                      settings={state.settings} 
-                    />
-                  </React.Fragment>
-                );
-              }
-              if (id === 'forecast') {
-                return (
-                  <div key="forecast" className="flex flex-col gap-4">
-                    <HourlyForecast 
-                      weather={activeWeather} 
-                      settings={state.settings} 
-                    />
-                    {state.settings.enabledTiles?.forecast !== false && (
-                      <DailyForecast 
-                        weather={activeWeather} 
-                        settings={state.settings} 
-                      />
-                    )}
-                  </div>
-                );
-              }
-              if (id === 'sunMoon') {
-                return state.settings.enabledTiles?.sunMoon !== false && (
-                  <React.Fragment key="sunMoon">
-                    <SunPath 
-                      weather={activeWeather}
-                      settings={state.settings}
-                    />
-                  </React.Fragment>
-                );
-              }
-              if (['aqi', 'uv', 'pollen', 'humidityVisibility', 'precipitationWind'].includes(id)) {
-                return (
-                  <React.Fragment key={id}>
-                    <WeatherDetails 
-                      focusKey={id}
-                      weather={activeWeather} 
-                      settings={state.settings} 
-                      location={activeLocation || undefined}
-                    />
-                  </React.Fragment>
-                );
-              }
-              return null;
-            })}
+            {!(isAnyModalOpen || slideDirection !== null) ? (
+              <motion.div
+                key="active-tiles-container"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="flex flex-col gap-4"
+              >
+                {(state.settings.tileOrder || [
+                  'rainGraph',
+                  'forecast',
+                  'aqi',
+                  'uv',
+                  'pollen',
+                  'humidityVisibility',
+                  'precipitationWind',
+                  'sunMoon'
+                ]).map(id => {
+                  if (id === 'rainGraph') {
+                    return state.settings.enabledTiles?.rainGraph !== false && (
+                      <React.Fragment key="rainGraph">
+                        <UpcomingRainGraph 
+                          weather={activeWeather} 
+                          settings={state.settings} 
+                        />
+                      </React.Fragment>
+                    );
+                  }
+                  if (id === 'forecast') {
+                    return (
+                      <div key="forecast" className="flex flex-col gap-4">
+                        <HourlyForecast 
+                          weather={activeWeather} 
+                          settings={state.settings} 
+                        />
+                        {state.settings.enabledTiles?.forecast !== false && (
+                          <DailyForecast 
+                            weather={activeWeather} 
+                            settings={state.settings} 
+                          />
+                        )}
+                      </div>
+                    );
+                  }
+                  if (id === 'sunMoon') {
+                    return state.settings.enabledTiles?.sunMoon !== false && (
+                      <React.Fragment key="sunMoon">
+                        <SunPath 
+                          weather={activeWeather}
+                          settings={state.settings}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+                  if (['aqi', 'uv', 'pollen', 'humidityVisibility', 'precipitationWind'].includes(id)) {
+                    return (
+                      <React.Fragment key={id}>
+                        <WeatherDetails 
+                          focusKey={id}
+                          weather={activeWeather} 
+                          settings={state.settings} 
+                          location={activeLocation || undefined}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+                  return null;
+                })}
+              </motion.div>
+            ) : null}
           </div>
 
           <div className="h-24" />
@@ -3207,17 +3196,18 @@ export default function App() {
         )}
       </div>
 
-      <AnimatePresence>
-        {state.showSettings && (
-          <motion.div
+        <AnimatePresence>
+          {state.showSettings && (
+            <motion.div
             key="settings-screen-root"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0.9, x: "100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0.9, x: "100%" }}
             transition={{ 
-              duration: 0.18, 
-              ease: [0.25, 0.46, 0.45, 0.94]
+              duration: 0.32, 
+              ease: [0.16, 1, 0.3, 1]
             }}
+            style={{ willChange: "transform" }}
             className="fixed inset-0 z-[99999] bg-app-bg overflow-hidden transform-gpu"
           >
             <SettingsScreen 
@@ -3238,14 +3228,15 @@ export default function App() {
         {showCityManager && (
           <motion.div 
             key="city-manager-root"
-            initial={{ opacity: 0, scale: 0.98, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 10 }}
+            initial={{ opacity: 0.9, x: "100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0.9, x: "100%" }}
             transition={{ 
-              duration: 0.18, 
-              ease: [0.25, 0.46, 0.45, 0.94]
+              duration: 0.32, 
+              ease: [0.16, 1, 0.3, 1]
             }}
-            className="fixed inset-0 z-[99990] bg-app-bg overflow-y-auto gpu"
+            style={{ willChange: "transform" }}
+            className="fixed inset-0 z-[99990] bg-app-bg overflow-y-auto transform-gpu"
             data-no-swipe
           >
             <CityManager 
@@ -3284,14 +3275,14 @@ export default function App() {
         {showSearch && (
           <motion.div 
             key="search-bar-root"
-            initial={{ opacity: 0, y: 30, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.98 }}
+            initial={{ opacity: 0, x: "100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: "100%" }}
             transition={{ 
-              duration: 0.18, 
+              duration: 0.35, 
               ease: [0.25, 0.46, 0.45, 0.94]
             }}
-            className="fixed inset-0 z-[99995] bg-app-bg/90 backdrop-blur-2xl flex flex-col pt-[calc(env(safe-area-inset-top)+24px)]"
+            className="fixed inset-0 z-[99995] bg-app-bg flex flex-col pt-[calc(env(safe-area-inset-top,24px)+36px)] transform-gpu"
             data-no-swipe
           >
             <SearchBar 
@@ -3318,14 +3309,14 @@ export default function App() {
         {showRadarMap && (
           <motion.div
             key="radar-map-root"
-            initial={{ opacity: 0, y: 40, scale: 0.99 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 40, scale: 0.99 }}
+            initial={{ opacity: 0, x: "-100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: "-100%" }}
             transition={{ 
-              duration: 0.18, 
+              duration: 0.35, 
               ease: [0.25, 0.46, 0.45, 0.94]
             }}
-            className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-2xl gpu settings-panel flex flex-col will-change-transform"
+            className="fixed inset-0 z-[120] bg-app-bg settings-panel flex flex-col will-change-transform transform-gpu"
             data-no-swipe
           >
             <WeatherRadarMap 
@@ -3342,7 +3333,7 @@ export default function App() {
 
       <main 
         className={cn(
-          "max-w-[390px] mx-auto px-6 pb-32 min-h-screen relative touch-pan-y bottom-content transition-[opacity,transform,padding-top] duration-250 ease-out",
+          "max-w-[390px] mx-auto px-4 sm:px-[21px] pb-32 min-h-screen relative touch-pan-y bottom-content transition-[opacity,transform,padding-top] duration-250 ease-out",
           state.settings.layoutWeatherDetail === 'compact'
             ? "pt-[calc(env(safe-area-inset-top,24px)+24px)]"
             : "pt-[calc(env(safe-area-inset-top,24px)+116px)]",

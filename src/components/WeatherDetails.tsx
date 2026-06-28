@@ -660,12 +660,12 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
   const windSeverityRating = getWindSeverityRating(weather.current.windSpeed || 0);
 
   return (
-    <div className="flex flex-col gap-4 px-0 -mx-[21px] md:-mx-[21px]">
+    <div className="flex flex-col gap-[1rem] px-0 -mx-[1rem] sm:-mx-[1.3125rem]">
       {detailsKeys.map(key => {
         if (key === 'aqi') {
           if (!tiles.aqi) return null;
           return (
-        <div key={key} id="aqi-glass-card" className="w-full max-w-[335px] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] py-5 px-6 flex flex-col gap-4 overflow-hidden shadow-2xl relative group">
+        <div key={key} id="aqi-glass-card" className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 select-none">
               <Leaf className="w-5 h-5 text-app-text/75" strokeWidth={1.4} />
@@ -826,7 +826,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
     if (key === 'uv') {
       if (!tiles.uv) return null;
       return (
-        <div key={key} className="w-full max-w-[335px] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] py-5 px-6 flex flex-col gap-4 overflow-hidden shadow-2xl relative group">
+        <div key={key} className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 select-none font-sans">
               <Sun className="w-5 h-5 text-app-text/75" strokeWidth={1.4} />
@@ -971,7 +971,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
       }
 
       return (
-        <div key={key} className="w-full max-w-[335px] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] py-5 px-6 flex flex-col gap-4 overflow-hidden shadow-2xl relative group select-none animate-fade-in animate-duration-500">
+        <div key={key} className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group select-none animate-fade-in animate-duration-500">
           {/* Header Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 select-none">
@@ -1109,10 +1109,10 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
     if (key === 'humidityVisibility') {
       if (tiles.humidity === false && tiles.visibility === false) return null;
       return (
-        <div key={key} className="grid grid-cols-2 gap-2.5 w-full max-w-[335px] mx-auto">
+        <div key={key} className="grid grid-cols-[repeat(auto-fit,minmax(8.125rem,1fr))] gap-[0.625rem] w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto">
           {/* A. Humidity Card */}
           {tiles.humidity !== false && (
-            <div className="col-span-1 bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] p-5 flex flex-col justify-between h-[218px] select-none relative overflow-hidden group shadow-xl">
+            <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.125rem] px-[1rem] sm:p-[1.25rem] flex flex-col justify-between h-[13.625rem] select-none relative overflow-hidden group shadow-xl">
               {/* Header with circular monochrome icon */}
               <div className="flex items-center justify-between z-10 w-full">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1172,7 +1172,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
 
           {/* B. Visibility Card (Perfect iOS alignment redesign matching mockup image) */}
           {tiles.visibility !== false && (
-            <div className="col-span-1 bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] p-5 flex flex-col justify-between h-[218px] select-none relative overflow-hidden group shadow-xl">
+            <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.125rem] px-[1rem] sm:p-[1.25rem] flex flex-col justify-between h-[13.625rem] select-none relative overflow-hidden group shadow-xl">
               {/* Header row with circular background eye icon */}
               <div className="flex items-center justify-between z-10 w-full">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1248,7 +1248,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
     if (key === 'precipitationWind') {
       if (tiles.precipitation === false && tiles.wind === false) return null;
       return (
-        <div key={key} className="grid grid-cols-2 gap-2.5 w-full max-w-[335px] mx-auto">
+        <div key={key} className="grid grid-cols-[repeat(auto-fit,minmax(8.125rem,1fr))] gap-[0.625rem] w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto">
           {/* C. Precipitation Card (5-Hour, Rounded Rectangle Bars) */}
           {tiles.precipitation !== false && (() => {
               const hourlyPrecips = weather.hourly?.precipitation || [];
@@ -1259,7 +1259,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
               const avgPrecipFormatted = formatPrecipitation(avgPrecipVal, settings.unitPrecipitation as any);
               const displayPrecipUnit = settings.unitPrecipitation || 'mm';
               return (
-                <div className="col-span-1 bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] p-5 flex flex-col justify-between h-[218px] select-none relative overflow-hidden group shadow-xl">
+                <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.125rem] px-[1rem] sm:p-[1.25rem] flex flex-col justify-between h-[13.625rem] select-none relative overflow-hidden group shadow-xl">
                   {/* Header row with rain icon */}
                   <div className="flex items-center justify-between z-10 w-full">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1343,7 +1343,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
 
             {/* D. Wind Speed Card (Enlarged and optimized with circular wind icon) */}
             {tiles.wind !== false && (
-              <div className="col-span-1 bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] p-5 flex flex-col justify-between h-[218px] select-none relative overflow-hidden group shadow-xl">
+              <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.125rem] px-[1rem] sm:p-[1.25rem] flex flex-col justify-between h-[13.625rem] select-none relative overflow-hidden group shadow-xl">
                 {/* Header row with wind icon */}
                 <div className="flex items-center justify-between z-10 w-full">
                   <div className="flex items-center gap-2 min-w-0">
@@ -1355,8 +1355,8 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                 </div>
 
                 {/* SVG Gauge block centered & shifted down (removed relative -mt-7) */}
-                <div className="flex flex-col items-center justify-center relative mt-1">
-                  <div className="relative w-44 h-[112px] flex items-center justify-center">
+                <div className="flex flex-col items-center justify-center relative mt-[0.25rem] w-full">
+                  <div className="relative w-full max-w-[8.75rem] aspect-[160/115] mx-auto flex items-center justify-center">
                     <svg viewBox="0 0 160 115" className="w-full h-full overflow-visible">
                       <defs>
                         {/* Elegant fade-to-opaque gradient targeting pointer end */}

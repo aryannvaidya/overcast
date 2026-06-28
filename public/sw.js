@@ -78,14 +78,33 @@ self.addEventListener("activate", e => {
   );
 });
 
+function staleWhileRevalidate(request) {
+  return caches.open(CACHE).then(cache => {
+    return cache.match(request).then(cachedResponse => {
+      const fetchPromise = fetch(request).then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200) {
+          cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+      }).catch(err => {
+        // Quiet failure for background update
+      });
+      return cachedResponse || fetchPromise;
+    });
+  });
+}
+
 self.addEventListener("fetch", e => {
+  if (e.request.method !== "GET") return;
+
   const url = new URL(e.request.url);
 
   // API calls — network first, cache fallback
   if (
     url.hostname.includes("open-meteo.com") ||
     url.hostname.includes("waqi.info") ||
-    url.hostname.includes("geocoding-api.open-meteo.com")
+    url.hostname.includes("geocoding-api.open-meteo.com") ||
+    url.pathname.startsWith("/api/")
   ) {
     e.respondWith(
       fetch(e.request)
@@ -102,27 +121,29 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // App shell — cache first
+  // Check if it's navigation mode -> serve index.html stale-while-revalidate
+  const isNavigation = e.request.mode === "navigate" || 
+                       (e.request.headers.get("accept") && 
+                        e.request.headers.get("accept").includes("text/html"));
+
+  if (isNavigation) {
+    e.respondWith(staleWhileRevalidate("/index.html"));
+    return;
+  }
+
+  // App shell / Local asset / Fonts -> stale-while-revalidate
+  const isLocalAsset = url.origin === location.origin;
+  const isFont = url.hostname.includes("fonts.googleapis.com") || url.hostname.includes("fonts.gstatic.com");
+
+  if (isLocalAsset || isFont) {
+    e.respondWith(staleWhileRevalidate(e.request));
+    return;
+  }
+
+  // Fallback default
   e.respondWith(
     caches.match(e.request)
-      .then(cached => {
-        if (cached) return cached;
-        return fetch(e.request).then(res => {
-          // Cache fonts or other assets on the fly
-          if (url.origin === location.origin || url.hostname.includes("fonts.googleapis.com") || url.hostname.includes("fonts.gstatic.com")) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        });
-      })
-      .catch(() => {
-        if (e.request.mode === "navigate" || (e.request.headers.get("accept") && e.request.headers.get("accept").includes("text/html"))) {
-          return caches.match("/index.html");
-        }
-        // Return a basic error response or just let the browser handle it
-        return new Response("Resource offline", { status: 503, statusText: "Offline" });
-      })
+      .then(cached => cached || fetch(e.request))
   );
 });
 

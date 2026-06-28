@@ -997,6 +997,27 @@ export async function fetchIPLocation(): Promise<{ lat: number; lon: number; cit
 
 export async function reverseGeocode(lat: number, lon: number, langCode?: string): Promise<Partial<Location> | null> {
   const langKey = (langCode || 'en').toLowerCase().slice(0, 2);
+
+  // 0. Server-side proxy with Gemini fallback: Bulletproof, avoids client issues & rate-limiting
+  try {
+    console.log('[ReverseGeocode] Requesting server-side reverse geocoding via /api/reverse-geocode');
+    const proxyUrl = `/api/reverse-geocode?lat=${lat}&lon=${lon}`;
+    const response = await fetchWithTimeout(proxyUrl, {}, 4000, 0);
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.name && data.name !== "Current Location") {
+        console.log('[ReverseGeocode] Successfully resolved via server-side reverse geocode proxy:', data.name);
+        return {
+          name: data.name,
+          country: data.country || "Nearby",
+          admin1: data.admin1 || ""
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[ReverseGeocode] Server-side reverse geocode proxy failed, trying client fallbacks:', err);
+  }
+
   // 1. Primary: Photon by Komoot (Un-rate-limited, open, built on OpenStreetMap, extremely fast & robust)
   try {
     console.log('[PhotonGeocoding] Running Photon Reverse Geocoding with lang:', langKey);

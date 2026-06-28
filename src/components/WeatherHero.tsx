@@ -60,10 +60,9 @@ export default function WeatherHero({
   };
 
   const slideTransition = {
-    type: "spring",
-    stiffness: 260,
-    damping: 24,
-    mass: 0.5
+    type: "tween",
+    ease: [0.16, 1, 0.3, 1], // Buttery smooth ease-out-quint matching native high-end platforms
+    duration: 0.55
   };
 
   const theme = getWeatherThemeColor(info.weatherCode, info.isDay);
@@ -153,6 +152,7 @@ export default function WeatherHero({
         animate={{ y: 0, opacity: 1 }}
         transition={slideTransition}
         className="flex items-center gap-2 mb-4"
+        style={{ willChange: 'transform, opacity' }}
       >
         <div className="flex items-center gap-2 bg-app-surface py-1.5 px-3 rounded-full border border-app-border">
           <Moon className="w-3 h-3 text-app-text-dim/80 shrink-0" strokeWidth={1.5} />
@@ -199,6 +199,7 @@ export default function WeatherHero({
           animate={{ y: 0, opacity: 1 }}
           transition={slideTransition}
           className="mb-4 flex flex-col items-center overflow-visible"
+          style={{ willChange: 'transform, opacity' }}
         >
           <WeatherIcon 
             name={info.icon as any} 
@@ -213,6 +214,7 @@ export default function WeatherHero({
           animate={{ y: 0, opacity: 1 }}
           transition={slideTransition}
           className="relative flex justify-center -mr-6"
+          style={{ willChange: 'transform, opacity' }}
         >
           <span className="text-[140px] leading-none font-[100] tracking-tighter text-app-text">
             {formatTemp(weather.current.temperature, settings.unitTemp)}
@@ -220,11 +222,22 @@ export default function WeatherHero({
           <span className="text-6xl font-[400] text-app-text mt-4 ml-1">°</span>
         </motion.div>
 
+        <motion.div
+          initial={{ y: 15, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={slideTransition}
+          className="text-xl font-bold text-app-text/90 mt-1 mb-1"
+          style={{ willChange: 'transform, opacity' }}
+        >
+          <Translate text="Feels like" lang={settings.language || 'en'} />: {formatTemp(weather.current.apparentTemperature, settings.unitTemp)}°
+        </motion.div>
+
         <motion.div 
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={slideTransition}
-          className="flex flex-col items-center gap-2 mt-4"
+          className="flex flex-col items-center gap-2 mt-3"
+          style={{ willChange: 'transform, opacity' }}
         >
           <span className="text-xl font-medium text-app-text/90">{translateWmoCode(weather.current.weatherCode, settings.language || 'en')}</span>
           <div className="flex items-center gap-3 text-app-text-dim text-[14px] font-medium tracking-wide">
