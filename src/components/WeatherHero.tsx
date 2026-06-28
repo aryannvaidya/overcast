@@ -20,6 +20,7 @@ interface WeatherHeroProps {
   slideDirection?: 'left' | 'right' | null;
   onOpenSettings?: () => void;
   onOpenCityManager?: () => void;
+  onOpenRadarMap?: () => void;
 }
 
 export default function WeatherHero({ 
@@ -30,7 +31,8 @@ export default function WeatherHero({
   isRefreshing, 
   slideDirection,
   onOpenSettings,
-  onOpenCityManager
+  onOpenCityManager,
+  onOpenRadarMap
 }: WeatherHeroProps) {
   if (!weather || !weather.current) return null;
   const info = getCurrentWeatherState(weather);
@@ -91,18 +93,34 @@ export default function WeatherHero({
             <Icons.ChevronDown className="w-4 h-4 text-app-text/60 group-hover:text-app-text transition-colors shrink-0" strokeWidth={2.5} />
           </button>
 
-          {/* Settings Trigger */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              Haptic.medium(settings.hapticEnabled);
-              onOpenSettings?.();
-            }}
-            className="w-11 h-11 relative z-50 pointer-events-auto bg-app-surface border border-app-border flex items-center justify-center rounded-full active:scale-[0.95] hover:bg-app-surface/80 hover:border-app-border/80 transition-all select-none cursor-pointer"
-            style={{ touchAction: 'manipulation' }}
-          >
-            <Icons.Settings2 className="w-5 h-5 text-app-text" strokeWidth={2} />
-          </button>
+          {/* Actions Row */}
+          <div className="flex items-center gap-2 relative z-50">
+            {/* Radar Trigger */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                Haptic.medium(settings.hapticEnabled);
+                onOpenRadarMap?.();
+              }}
+              className="w-11 h-11 relative pointer-events-auto bg-app-surface border border-app-border flex items-center justify-center rounded-full active:scale-[0.95] hover:bg-app-surface/80 hover:border-app-border/80 transition-all select-none cursor-pointer"
+              style={{ touchAction: 'manipulation' }}
+            >
+              <Icons.Map className="w-5 h-5 text-app-text" strokeWidth={2} />
+            </button>
+
+            {/* Settings Trigger */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                Haptic.medium(settings.hapticEnabled);
+                onOpenSettings?.();
+              }}
+              className="w-11 h-11 relative pointer-events-auto bg-app-surface border border-app-border flex items-center justify-center rounded-full active:scale-[0.95] hover:bg-app-surface/80 hover:border-app-border/80 transition-all select-none cursor-pointer"
+              style={{ touchAction: 'manipulation' }}
+            >
+              <Icons.Settings2 className="w-5 h-5 text-app-text" strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         {/* Temperature, Icon, and Feels Like Side-by-Side Row */}
@@ -195,7 +213,7 @@ export default function WeatherHero({
         className="flex flex-col items-center overflow-visible w-full"
       >
         <motion.div 
-          initial={{ y: -20, opacity: 0 }}
+          initial={{ y: 15, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={slideTransition}
           className="mb-4 flex flex-col items-center overflow-visible"
@@ -210,7 +228,7 @@ export default function WeatherHero({
         </motion.div>
         
         <motion.div 
-          initial={{ y: 20, opacity: 0 }}
+          initial={{ y: 15, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={slideTransition}
           className="relative flex justify-center -mr-6"
@@ -233,7 +251,7 @@ export default function WeatherHero({
         </motion.div>
 
         <motion.div 
-          initial={{ y: -20, opacity: 0 }}
+          initial={{ y: 15, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={slideTransition}
           className="flex flex-col items-center gap-2 mt-3"

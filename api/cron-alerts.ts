@@ -48,7 +48,7 @@ export default async function handler(request: any, response: any) {
       }
 
       // Fetch active hourly forecast safely with professional browser headers
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,wind_speed_10m&hourly=weather_code,precipitation_probability,snowfall&timezone=auto`;
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m&hourly=weather_code,precipitation_probability,snowfall&timezone=auto`;
       const weatherResponse = await fetch(weatherUrl, {
         method: 'GET',
         headers: {
@@ -80,7 +80,6 @@ export default async function handler(request: any, response: any) {
       const hasSevereEnabled = fields.alertSevereEnabled?.booleanValue ?? false;
       const currentWind = current.wind_speed_10m || 0;
       const currentTemp = current.temperature_2m || 0;
-      const feelsLike = Math.round(current.apparent_temperature || currentTemp);
 
       // Check rain threshold
       const hasRainEnabled = fields.alertRainEnabled?.booleanValue ?? false;
@@ -96,21 +95,17 @@ export default async function handler(request: any, response: any) {
         alertTitle = 'Thunderstorm Alert ⛈️';
         alertMsg = `A thunderstorm is forecast in ${cityName} within the next 12 hours. Please seek indoor shelter.`;
       } 
-      else if (hasSevereEnabled && (currentWind > 75 || feelsLike >= 38 || currentTemp < -15)) {
-        alertTitle = '🔥 Extreme Heat Alert';
+      else if (hasSevereEnabled && (currentWind > 75 || currentTemp > 41 || currentTemp < -15)) {
+        alertTitle = 'Severe Weather Warning ⚠️';
         if (currentWind > 75) {
-          alertTitle = '⚠️ Severe Weather Warning';
           alertMsg = `Extreme wind gusts detected in ${cityName} (${currentWind} km/h). Secure loose outdoor items.`;
-        } else if (currentTemp < -15) {
-          alertTitle = '🥶 Extreme Cold Alert';
-          alertMsg = `${currentTemp}° in ${cityName}. Bundle up and stay warm.`;
         } else {
-          alertMsg = `Feels like ${feelsLike}° in ${cityName}. Stay hydrated. Avoid direct sun.`;
+          alertMsg = `Extreme temperature registered in ${cityName} (${currentTemp}°C). Take proper safety precautions.`;
         }
       }
       else if (hasRainEnabled && maxRainProb >= rainThreshold) {
-        alertTitle = `Rain Alert: Heading to ${cityName}? ☔`;
-        alertMsg = `There is a ${maxRainProb}% chance of rain in ${cityName} today. Don't forget to bring an umbrella! 🌧️`;
+        alertTitle = 'Rain Trigger Alert 🌧️';
+        alertMsg = `Precipitation probability in ${cityName} has reached ${maxRainProb}%, crossing your custom ${rainThreshold}% notify threshold.`;
       }
       else if (hasSnowEnabled && maxSnowfall > 0 && maxRainProb >= snowThreshold) {
         alertTitle = 'Snow Trigger Alert ❄️';

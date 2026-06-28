@@ -14,21 +14,12 @@ export function getCityKey(location: Location): string {
     .toLowerCase();
 }
 
-import { runSelfLearningBatch } from '../services/mlService';
-
 export function saveWeatherData(locationKey: string, data: WeatherData) {
   try {
     const cacheRaw = localStorage.getItem(STORAGE_KEYS.WEATHER_CACHE);
     const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
     cache[locationKey] = { data, ts: Date.now() };
     localStorage.setItem(STORAGE_KEYS.WEATHER_CACHE, JSON.stringify(cache));
-    
-    // Trigger on-device self-learning batch to capture predictions vs actuals
-    try {
-      runSelfLearningBatch(locationKey, data);
-    } catch (mlErr) {
-      console.warn('[MLService] Automatic batch capture failed:', mlErr);
-    }
   } catch (e) {
     console.error('Failed to save weather data to cache', e);
   }

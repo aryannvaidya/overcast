@@ -318,40 +318,6 @@ body::-webkit-scrollbar,
   color: rgba(var(--text-primary-rgb), 0.15) !important;
 }
 
-/* Ensure widgets always preserve white text even in light mode */
-.widget-theme-override, .widget-theme-override * {
-  --widget-white: #ffffff !important;
-}
-.text-widget-white, .text-widget-white * {
-  color: #ffffff !important;
-}
-.text-widget-dark, .text-widget-dark * {
-  color: #0e1b12 !important;
-}
-.widget-theme-override .text-white,
-.widget-theme-override .text-neutral-50,
-.widget-theme-override [class*="text-white"] {
-  color: #ffffff !important;
-}
-.widget-theme-override .text-white\/90 { color: rgba(255, 255, 255, 0.9) !important; }
-.widget-theme-override .text-white\/80 { color: rgba(255, 255, 255, 0.8) !important; }
-.widget-theme-override .text-white\/75 { color: rgba(255, 255, 255, 0.75) !important; }
-.widget-theme-override .text-white\/70 { color: rgba(255, 255, 255, 0.7) !important; }
-.widget-theme-override .text-white\/60,
-.widget-theme-override .text-white\/55,
-.widget-theme-override .text-white\/50,
-.widget-theme-override .text-white\/45,
-.widget-theme-override .text-white\/40,
-.widget-theme-override .text-white\/30 {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-.widget-theme-override .text-white\/20,
-.widget-theme-override .text-white\/15,
-.widget-theme-override .text-white\/10 {
-  color: rgba(255, 255, 255, 0.15) !important;
-}
-
-
 /* Hardcoded card / section backgrounds to matching high glass opacity values */
 [data-theme="light"] .bg-white\/\[0\.04\] {
   background-color: var(--surface-color) !important; /* Elegant semi-white frosted glassmorphic cards matching sources page */
@@ -460,7 +426,7 @@ body::-webkit-scrollbar,
   color: var(--text-secondary) !important;
 }
 [data-theme="light"] .text-white\/50,
-[data-theme="light"] .text-\[\#8e8e93\] {
+[data-theme="light"] .text-[#8e8e93] {
   color: var(--text-secondary) !important;
 }
 [data-theme="light"] svg {
@@ -871,102 +837,5 @@ select,
 .animate-wave2 {
   animation: waveMotion2 5s ease-in-out infinite;
   will-change: transform;
-}
-
-/* ============================================
-   WEATHER WIDGET CSS KEYFRAME ANIMATIONS & GPU UTILS
-   ============================================ */
-
-/* GPU Acceleration utility */
-.gpu {
-  transform: translate3d(0, 0, 0) translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-  will-change: transform;
-}
-
-/* Rain falling animation */
-@keyframes rainFall {
-  0% {
-    transform: translateY(0) rotate(15deg);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(160px) rotate(15deg);
-    opacity: 0;
-  }
-}
-
-.animate-fall {
-  animation: rainFall 1.2s linear infinite;
-  will-change: transform, opacity;
-  transform: translate3d(0, 0, 0);
-}
-
-/* Snow drifting animation */
-@keyframes snowDrift {
-  0% {
-    transform: translateY(0) translateX(0);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  50% {
-    transform: translateY(80px) translateX(8px);
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(160px) translateX(-8px);
-    opacity: 0;
-  }
-}
-
-.animate-drift {
-  animation: snowDrift 4s ease-in-out infinite;
-  will-change: transform, opacity;
-  transform: translate3d(0, 0, 0);
-}
-
-/* Clouds floating animation */
-@keyframes floatClouds {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-float-clouds {
-  animation: floatClouds 25s linear infinite;
-  will-change: transform;
-  transform: translate3d(0, 0, 0);
-}
-
-/* Sun/Moon pulse glow */
-@keyframes pulseGlow {
-  0%, 100% {
-    transform: scale(1) translate3d(0,0,0);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.15) translate3d(0,0,0);
-    opacity: 1;
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 4s ease-in-out infinite;
-  will-change: transform, opacity;
-  transform: translate3d(0, 0, 0);
 }
 

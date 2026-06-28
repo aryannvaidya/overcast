@@ -1,20 +1,15 @@
 
 
 <p align="center">
-  <img src="assest/preview/overcast.png" width="40%">
+  <img src="assest/icons/overcast.png" width="40%">
 </p>
+
 <div align="center">
   <h3>Overcast</h3>
   <p>Overcast is a clean and not minimal weather app featuring real-time weather, hourly and daily forecasts, air quality, UV index, live radar and a polished UI.
 </p>
 </div>
 
-<p align="center">
-  <img alt="Downloads" src="https://img.shields.io/github/downloads/aryannvaidya/overcast/total?style=for-the-badge&logo=github">
-  <img alt="Stars" src="https://img.shields.io/github/stars/aryannvaidya/overcast?style=for-the-badge">
-  <img alt="Latest Release" src="https://img.shields.io/github/v/release/aryannvaidya/overcast?style=for-the-badge">
-  <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge">
-</p>
 
 ---
 
@@ -92,15 +87,6 @@
 
 ---
 
-
-## 🌿 Pollen Forecast
-
-**In Europe**, data comes straight from the Open-Meteo Air Quality API, which tracks real allergen concentrations by species.
-
-**Everywhere else**, Overcast uses its own pollen estimation engine that combines seasonal botanical calendars with live weather data. It factors in your climate zone, local vegetation patterns, temperature, humidity, wind, rainfall, and even time of day to estimate how much pollen is actually in the air.
-
-*Pollen forecasts outside Europe are modeled estimates derived from seasonal botanical patterns and real-time meteorological conditions. They are designed to provide meaningful allergy-risk guidance where direct pollen observations are not available, it can be inaccurate.*
-
 ## 🦸Getting Started
 
 This is a single-file static web app. No build tools, no npm, no setup.
@@ -141,16 +127,5 @@ overcast/
 
 This project is licensed under the MIT License.
 
----
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=aryannvaidya%2Fovercast&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
- </picture>
-</a>
 
 

@@ -1,37 +1,20 @@
-const APP_ID   = process.env.ONESIGNAL_APP_ID;
+const APP_ID = process.env.ONESIGNAL_APP_ID;
 const REST_KEY = process.env.ONESIGNAL_REST_KEY;
-const NOTIF_TYPE = process.argv[2];
+const NOTIF_TYPE = process.argv[2]; // "morning" | "night" | "severe"
 
-const FIREBASE_PROJECT_ID = 'nimbus-8e720';
-const FIREBASE_API_KEY    = 'AIzaSyDhGKcNiaBmNTO0U6JSBo5mu5n0_vSevPM';
-const FIREBASE_DB_ID      = 'ai-studio-42655dd6-4763-475c-a28c-d0f99b200092';
-
-console.log("Script started, type:", NOTIF_TYPE);
-console.log("APP_ID present:", !!APP_ID);
-console.log("REST_KEY present:", !!REST_KEY);
-
-const osHeaders = {
+const headers = {
   "Content-Type": "application/json",
   "Authorization": `Key ${REST_KEY}`,
 };
 
-// Get all OneSignal subscribers
-async function getSubscribers() {
+// Fetch all subscribed devices with tags
+async function getDevices() {
   const res = await fetch(
-    `https://onesignal.com/api/v1/players` +
-    `?app_id=${APP_ID}&limit=300`,
-    { headers: osHeaders }
+    `https://onesignal.com/api/v1/players?app_id=${APP_ID}&limit=300`,
+    { headers }
   );
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Failed:", res.status, err);
-    return [];
-  }
-
   const data = await res.json();
-  console.log("Total subscribers:", data.players?.length || 0);
-  return data.players || [];
+  return (data.players || []).filter(p => p.tags?.city);
 }
 
 // Get user location from Firestore
@@ -75,8 +58,7 @@ async function getUserFromFirestore(playerId) {
 
 // Fetch weather
 async function getWeather(lat, lon) {
-  const url =
-    `https://api.open-meteo.com/v1/forecast` +
+  const url = `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}&longitude=${lon}` +
     `&current=temperature_2m,apparent_temperature,weather_code` +
     `&daily=temperature_2m_max,temperature_2m_min,weather_code` +
@@ -86,16 +68,12 @@ async function getWeather(lat, lon) {
 }
 
 function getCondition(code) {
-  if (code === 0)  return "Clear sky";
-  if (code <= 2)   return "Partly cloudy";
-  if (code === 3)  return "Overcast";
-  if (code <= 48)  return "Foggy";
-  if (code <= 57)  return "Drizzle";
-  if (code <= 67)  return "Rain";
-  if (code <= 77)  return "Snow";
-  if (code <= 82)  return "Rain showers";
-  if (code <= 86)  return "Snow showers";
-  if (code >= 95)  return "Thunderstorm";
+  if (code === 0) return "Clear sky";
+  if (code <= 2) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if (code <= 67) return "Rain";
+  if (code <= 77) return "Snow";
+  if (code >= 95) return "Thunderstorm";
   return "Cloudy";
 }
 
@@ -195,11 +173,9 @@ async function run() {
 
     await new Promise(r => setTimeout(r, 200));
   }
-
-  console.log("Script completed.");
 }
 
 run().catch(err => {
-  console.error("Crashed:", err);
+y  console.error("Crashed:", err);
   process.exit(1);
 });

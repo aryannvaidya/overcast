@@ -42,41 +42,6 @@
     </script>
   </head>
   <body>
-    <!-- Beautiful Inline Loading Screen (Instant Paint) -->
-    <div id="app-loading-screen" style="
-      position: fixed;
-      inset: 0;
-      background-color: #0F1219;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 999999;
-      opacity: 1;
-      transition: opacity 0.25s ease-out;
-    ">
-      <div style="display: flex; flex-direction: column; align-items: center; gap: 24px;">
-        <!-- Beautiful minimalist cloud SVG matching Overcast's branding -->
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.85;">
-          <path d="M19.36 10.04C18.67 6.59 15.64 4 12 4C9.11 4 6.6 5.64 5.35 8.04C2.34 8.36 0 10.91 0 14C0 17.31 2.69 20 6 20H19C21.76 20 24 17.76 24 15C24 12.36 21.95 10.22 19.36 10.04Z" fill="white" fill-opacity="0.9"/>
-        </svg>
-        <!-- Sophisticated high-end spinner -->
-        <div class="inline-loader-spin" style="
-          width: 32px;
-          height: 32px;
-          border: 3px solid rgba(255, 255, 255, 0.1);
-          border-top: 3px solid #ffffff;
-          border-radius: 50%;
-          animation: webview-loading-spin 0.8s linear infinite;
-        "></div>
-      </div>
-      <style>
-        @keyframes webview-loading-spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      </style>
-    </div>
 
     <!-- Pre-warm backdrop-filter GPU pipeline to prevent transparent visual flashes on load -->
     <div id="blur-prewarm" style="
