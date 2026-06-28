@@ -1,7 +1,7 @@
 
 
 <p align="center">
-  <img src="assest/icons/overcast.png" width="40%">
+  <img src="assest/preview/overcast.png" width="40%">
 </p>
 
 <div align="center">
@@ -10,6 +10,12 @@
 </p>
 </div>
 
+<p align="center">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/aryannvaidya/overcast/total?style=for-the-badge&logo=github">
+  <img alt="Stars" src="https://img.shields.io/github/stars/aryannvaidya/overcast?style=for-the-badge">
+  <img alt="Latest Release" src="https://img.shields.io/github/v/release/aryannvaidya/overcast?style=for-the-badge">
+  <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge">
+</p>
 
 ---
 
@@ -127,5 +133,16 @@ overcast/
 
 This project is licensed under the MIT License.
 
+---
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=aryannvaidya%2Fovercast&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
+ </picture>
+</a>
 
 
