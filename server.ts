@@ -1008,6 +1008,117 @@ Return up to 5 matching result records in the exact JSON schema provided.`;
   res.json({ results: [] });
 });
 
+// --- API REVERSE GEOCODE PROXY WITH ACTIVE GEMINI RE-MAPPING ---
+app.get('/api/reverse-geocode', async (req, res) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lon = parseFloat(req.query.lon as string);
+  
+  if (isNaN(lat) || isNaN(lon)) {
+    return res.status(400).json({ error: "Invalid coordinates" });
+  }
+
+  // 1. Try server-side Photon reverse geocode
+  try {
+    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`;
+    console.log(`[Server ReverseGeocode] Requesting Photon: ${url}`);
+    const response = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    }, 2500);
+    
+    if (response && response.ok) {
+      const data = await response.json();
+      if (data && data.features && data.features.length > 0) {
+        const props = data.features[0].properties || {};
+        const name = props.district || props.locality || props.suburb || props.village || props.town || props.city || props.name;
+        if (name && name.trim().toLowerCase() !== 'unnamed road') {
+          console.log(`[Server ReverseGeocode] Resolved via Photon: ${name}`);
+          return res.json({
+            name,
+            country: props.country || "Nearby",
+            admin1: props.state || ""
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Server ReverseGeocode] Photon failed:", err);
+  }
+
+  // 2. Try server-side BigDataCloud reverse geocode client API
+  try {
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+    console.log(`[Server ReverseGeocode] Requesting BigDataCloud: ${url}`);
+    const response = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    }, 2500);
+
+    if (response && response.ok) {
+      const item = await response.json();
+      let name = item.locality || item.city;
+      if (item.localityInfo?.administrative) {
+        const adminList = item.localityInfo.administrative;
+        const sortedAdmin = [...adminList].sort((a: any, b: any) => (b.order || 0) - (a.order || 0));
+        const localObj = sortedAdmin.find((a: any) => a.order >= 6 && a.order <= 10 && a.name);
+        if (localObj) name = localObj.name;
+      }
+      if (!name) name = item.principalSubdivision;
+
+      if (name) {
+        console.log(`[Server ReverseGeocode] Resolved via BigDataCloud: ${name}`);
+        return res.json({
+          name,
+          country: item.countryName || "Nearby",
+          admin1: item.principalSubdivision || ""
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[Server ReverseGeocode] BigDataCloud failed:", err);
+  }
+
+  // 3. Try Gemini reverse geocoding with Web grounding
+  if (ai) {
+    try {
+      console.log(`[Server ReverseGeocode] Running resilient Gemini model search for closest city at Lat: ${lat}, Lon: ${lon}`);
+      const prompt = `Identify the nearest well-known city, town, or municipality name of these GPS coordinates: Latitude ${lat}, Longitude ${lon}.\nStrictly return your response as a valid JSON object matching this schema.`;
+      
+      const reverseGeocodeSchema = {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          country: { type: Type.STRING },
+          admin1: { type: Type.STRING }
+        },
+        required: ["name"]
+      };
+
+      const geminiRes = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: reverseGeocodeSchema
+        }
+      });
+
+      const jsonText = geminiRes.text;
+      if (jsonText) {
+        const parsed = JSON.parse(jsonText.trim());
+        if (parsed.name) {
+          console.log(`[Server ReverseGeocode] Successfully resolved with Gemini: ${parsed.name}`);
+          return res.json(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("[Server ReverseGeocode] Gemini reverse search failed:", e);
+    }
+  }
+
+  // Fallback
+  return res.json({ name: "Current Location", country: "Nearby" });
+});
+
 // --- API AIR QUALITY PROXY WITH RESILIENT AIR QUALITY RECONSTRUCTION ---
 app.get('/api/air-quality-proxy', async (req, res) => {
   const url = req.url || '';

@@ -73,14 +73,33 @@ self.addEventListener("activate", e => {
   );
 });
 
+function staleWhileRevalidate(request) {
+  return caches.open(CACHE).then(cache => {
+    return cache.match(request).then(cachedResponse => {
+      const fetchPromise = fetch(request).then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200) {
+          cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+      }).catch(err => {
+        // Quiet failure for background update
+      });
+      return cachedResponse || fetchPromise;
+    });
+  });
+}
+
 self.addEventListener("fetch", e => {
+  if (e.request.method !== "GET") return;
+
   const url = new URL(e.request.url);
 
   // API calls — network first, cache fallback
   if (
     url.hostname.includes("open-meteo.com") ||
     url.hostname.includes("waqi.info") ||
-    url.hostname.includes("geocoding-api.open-meteo.com")
+    url.hostname.includes("geocoding-api.open-meteo.com") ||
+    url.pathname.startsWith("/api/")
   ) {
     e.respondWith(
       fetch(e.request)
@@ -97,6 +116,29 @@ self.addEventListener("fetch", e => {
     return;
   }
 
+  // Check if it's navigation mode -> serve index.html stale-while-revalidate
+  const isNavigation = e.request.mode === "navigate" || 
+                       (e.request.headers.get("accept") && 
+                        e.request.headers.get("accept").includes("text/html"));
+
+  if (isNavigation) {
+    e.respondWith(staleWhileRevalidate("/index.html"));
+    return;
+  }
+
+  // App shell / Local asset / Fonts -> stale-while-revalidate
+  const isLocalAsset = url.origin === location.origin;
+  const isFont = url.hostname.includes("fonts.googleapis.com") || url.hostname.includes("fonts.gstatic.com");
+
+  if (isLocalAsset || isFont) {
+    e.respondWith(staleWhileRevalidate(e.request));
+    return;
+  }
+
+  // Fallback default
+  e.respondWith(
+    caches.match(e.request)
+      .then(cached => cached || fetch(e.request))
   // App shell — Network first, falling back to cache
   e.respondWith(
     fetch(e.request)

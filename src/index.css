@@ -282,6 +282,21 @@ body::-webkit-scrollbar,
   box-shadow: 0 0 8px rgba(var(--theme-accent-rgb), 0.3) !important;
 }
 
+/* Custom utilities for pure colors that are never overridden in light theme */
+.text-pure-white {
+  color: #ffffff !important;
+}
+.text-pure-black {
+  color: #000000 !important;
+}
+.static-weather-icon-wrapper * {
+  animation: none !important;
+  -webkit-animation: none !important;
+  animation-name: none !important;
+  -webkit-animation-name: none !important;
+  transition: none !important;
+}
+
 /* Prevent hard contrast issues with hardcoded tailwind white classes */
 [data-theme="light"] .text-white {
   color: var(--text-primary) !important;
@@ -358,12 +373,14 @@ body::-webkit-scrollbar,
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
 }
-[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/80 {
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/80,
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/50 {
   background-color: rgba(var(--theme-accent-rgb), 0.05) !important;
   color: rgba(var(--text-primary-rgb), 0.6) !important;
   border-color: transparent !important;
 }
-[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/80:hover {
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/80:hover,
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) button.bg-white\/\[0\.06\].text-white\/50:hover {
   background-color: rgba(var(--theme-accent-rgb), 0.08) !important;
   color: rgba(var(--text-primary-rgb), 0.8) !important;
 }
@@ -382,17 +399,35 @@ body::-webkit-scrollbar,
 }
 
 /* Beautiful iOS Toggles adaptivity */
-[data-theme="light"] .toggle.bg-white {
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) .toggle.bg-white {
   background-color: var(--toggle-color) !important; /* Dynamic classic action color */
 }
-[data-theme="light"] .toggle.bg-white div {
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) .toggle.bg-white div {
   background-color: #ffffff !important;
 }
-[data-theme="light"] .toggle.bg-white\/10 {
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) .toggle.bg-white\/10 {
   background-color: rgba(0, 0, 0, 0.08) !important;
 }
-[data-theme="light"] .toggle.bg-white\/10 div {
+[data-theme="light"]:not([data-color-theme="pink"]):not([data-color-theme="midnight"]) .toggle.bg-white\/10 div {
   background-color: #ffffff !important;
+}
+
+/* AMOLED and Midnight Toggle overrides */
+[data-color-theme="pink"] .toggle,
+[data-color-theme="midnight"] .toggle {
+  background-color: rgba(255, 255, 255, 0.16) !important;
+}
+[data-color-theme="pink"] .toggle.bg-white,
+[data-color-theme="midnight"] .toggle.bg-white {
+  background-color: #ffffff !important;
+}
+[data-color-theme="pink"] .toggle div,
+[data-color-theme="midnight"] .toggle div {
+  background-color: #ffffff !important;
+}
+[data-color-theme="pink"] .toggle.bg-white div,
+[data-color-theme="midnight"] .toggle.bg-white div {
+  background-color: #000000 !important;
 }
 
 /* Overlays & Panels transitions (blur, light background contrast) */
@@ -667,6 +702,15 @@ body, html {
   animation: none !important;
   transition: none !important;
   will-change: auto !important;
+}
+
+/* EXCLUDE the main weather icon from target pauses so it runs continuously and animated during city switches */
+[data-animations="off"] .main-weather-svg-icon,
+[data-animations="off"] .main-weather-svg-icon * {
+  animation-play-state: running !important;
+  animation: inherit !important;
+  transition: inherit !important;
+  will-change: transform, opacity !important;
 }
 
 /* ONLY content fade is allowed during switch */

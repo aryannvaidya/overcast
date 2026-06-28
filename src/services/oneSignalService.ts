@@ -16,15 +16,35 @@ declare global {
 }
 
 export const tagDeviceLocation = (cityName: string, lat: number, lon: number) => {
-  if (typeof window !== 'undefined' && window.gonative?.onesignal?.setTag) {
-    window.gonative.onesignal.setTag({
-      key: "city", value: cityName
-    });
-    window.gonative.onesignal.setTag({
-      key: "lat", value: lat.toString()
-    });
-    window.gonative.onesignal.setTag({
-      key: "lon", value: lon.toString()
+  if (typeof window !== 'undefined') {
+    // 1. Tag via GoNative wrapper if active
+    if (window.gonative?.onesignal?.setTag) {
+      window.gonative.onesignal.setTag({ key: "city", value: cityName });
+      window.gonative.onesignal.setTag({ key: "lat", value: lat.toString() });
+      window.gonative.onesignal.setTag({ key: "lon", value: lon.toString() });
+    }
+    
+    // 2. Tag via web standard OneSignal deferred setup
+    safeOneSignal(async (OneSignal: any) => {
+      try {
+        if (OneSignal.User?.addTags) {
+          await OneSignal.User.addTags({
+            city: cityName,
+            lat: lat.toString(),
+            lon: lon.toString()
+          });
+          console.log("OneSignal web tags synced successfully:", cityName);
+        } else if (OneSignal.sendTags) {
+          await OneSignal.sendTags({
+            city: cityName,
+            lat: lat.toString(),
+            lon: lon.toString()
+          });
+          console.log("OneSignal web tags synced via legacy sendTags:", cityName);
+        }
+      } catch (err) {
+        console.warn("OneSignal web device location tagging failed:", err);
+      }
     });
   }
 
@@ -329,29 +349,7 @@ export const sendNotification = (title: string, body: string) => {
     return;
   }
 
-  safeOneSignal(async (OneSignal: any) => {
-    try {
-      const playerId = OneSignal.User?.PushSubscription?.id || localStorage.getItem("onesignal_player_id");
-      if (playerId) {
-        fetch("https://onesignal.com/api/v1/notifications", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            app_id: "d78d4db3-2898-4f81-8bba-c8b5b719ee1b",
-            include_subscription_ids: [playerId],
-            headings: { en: title },
-            contents: { en: body }
-          })
-        }).catch(err => console.warn("OneSignal service push failed:", err));
-      }
-    } catch (err) {
-      console.warn("Failed to dispatch push notification via REST:", err);
-    }
-  });
-
-  // Safe direct/SW notification helper
+  // Safe direct/SW notification helper (local notifications via service worker, no REST API needed)
   SafeNotif.send(title, body);
 };
 
@@ -389,41 +387,7 @@ export const buildMorningText = (weatherData: any, cityName: string) => {
 };
 
 export const scheduleMorningSummary = () => {
-  if (!NotifSettings.morningEnabled) return;
-
-  const now = new Date();
-  const morning = new Date();
-  morning.setHours(7, 30, 0, 0);
-
-  // If past 7:30 AM — schedule for tomorrow
-  if (now.getTime() > morning.getTime()) {
-    morning.setDate(morning.getDate() + 1);
-  }
-
-  const delay = morning.getTime() - now.getTime();
-  console.log("Morning summary in:", Math.round(delay / 60000), "minutes");
-
-  setTimeout(async () => {
-    try {
-      const raw = localStorage.getItem('app_locations');
-      if (raw) {
-        const locations = JSON.parse(raw);
-        if (locations && locations.length > 0) {
-          const city = locations[0];
-          const cached = getCachedWeatherData(getCityKey(city));
-          if (cached && cached.data) {
-            const { title, body } = buildMorningText(cached.data, city.name);
-            sendNotification(title, body);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Failed sending automated morning summary:", e);
-    }
-
-    // Schedule next day
-    scheduleMorningSummary();
-  }, delay);
+  // Handled reliably by GitHub Actions server-side script instead
 };
 
 // ============================================================================
@@ -444,40 +408,7 @@ export const buildNightText = (weatherData: any, cityName: string) => {
 };
 
 export const scheduleNightSummary = () => {
-  if (!NotifSettings.nightEnabled) return;
-
-  const now = new Date();
-  const night = new Date();
-  night.setHours(21, 0, 0, 0);
-
-  if (now.getTime() > night.getTime()) {
-    night.setDate(night.getDate() + 1);
-  }
-
-  const delay = night.getTime() - now.getTime();
-  console.log("Night summary in:", Math.round(delay / 60000), "minutes");
-
-  setTimeout(async () => {
-    try {
-      const raw = localStorage.getItem('app_locations');
-      if (raw) {
-        const locations = JSON.parse(raw);
-        if (locations && locations.length > 0) {
-          const city = locations[0];
-          const cached = getCachedWeatherData(getCityKey(city));
-          if (cached && cached.data) {
-            const { title, body } = buildNightText(cached.data, city.name);
-            sendNotification(title, body);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Failed sending automated night summary:", e);
-    }
-
-    // Schedule next night
-    scheduleNightSummary();
-  }, delay);
+  // Handled reliably by GitHub Actions server-side script instead
 };
 
 // ============================================================================

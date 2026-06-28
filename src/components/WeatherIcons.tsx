@@ -114,6 +114,8 @@ interface WeatherIconProps {
   className?: string;
   strokeWidth?: number;
   forceColoured?: boolean;
+  isSettingsPreview?: boolean;
+  bypassDelay?: boolean;
 }
 
 const WEATHER_ICONS_SET = new Set([
@@ -284,13 +286,53 @@ function getSvgFilename(name: string): string {
   return 'weather.svg';
 }
 
-export const WeatherIcon = ({ name, style: propStyle = 'outline', className, strokeWidth = 1.4, forceColoured = false }: WeatherIconProps) => {
+export const WeatherIcon = ({ name, style: propStyle = 'outline', className, strokeWidth = 1.4, forceColoured = false, isSettingsPreview = false, bypassDelay = false }: WeatherIconProps) => {
+  const [isStaticDelay, setIsStaticDelay] = useState(() => {
+    const lastSwitch = (window as any).lastCitySwitchTime || 0;
+    return (Date.now() - lastSwitch) < 2000;
+  });
+
+  useEffect(() => {
+    const checkDelay = () => {
+      const lastSwitch = (window as any).lastCitySwitchTime || 0;
+      const elapsed = Date.now() - lastSwitch;
+      if (elapsed < 2000) {
+        setIsStaticDelay(true);
+        const timer = setTimeout(() => {
+          setIsStaticDelay(false);
+        }, 2000 - elapsed);
+        return () => clearTimeout(timer);
+      } else {
+        setIsStaticDelay(false);
+      }
+    };
+
+    checkDelay();
+
+    const handleCitySwitch = () => {
+      checkDelay();
+    };
+
+    window.addEventListener('city-switch', handleCitySwitch);
+    return () => {
+      window.removeEventListener('city-switch', handleCitySwitch);
+    };
+  }, []);
+
   const Icon = RawIcons[name] || Cloud;
   let style: any = forceColoured ? 'coloured' : propStyle;
 
-  // We are replacing 'coloured' icon style in the app with the new beautiful animated outline style!
-  if (style === 'coloured') {
-    style = 'animated_outline';
+  if (isStaticDelay && !bypassDelay) {
+    if (style === 'animated_outline' || style === 'coloured') {
+      style = 'outline';
+    } else if (style === 'animated') {
+      style = 'static';
+    }
+  } else {
+    // We are replacing 'coloured' icon style in the app with the new beautiful animated outline style!
+    if (style === 'coloured') {
+      style = 'animated_outline';
+    }
   }
 
   // Handle new animated outline SVGs with high-performance embedding + cache
@@ -494,14 +536,20 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
   if ((style === 'static' || style === 'animated') && WEATHER_ICONS_SET.has(name)) {
     const filename = getSvgFilename(name);
     const isSunOrMoon = name.toLowerCase() === 'sun' || name.toLowerCase() === 'moon' || name.toLowerCase() === 'moonstar';
-    const scale = isSunOrMoon ? 2.025 : 1.35;
+    const scale = isSettingsPreview 
+      ? (isSunOrMoon ? 1.95 : 1.35) 
+      : (isSunOrMoon ? 2.025 : 1.35);
     const svgMap = style === 'static' ? STATIC_SVGS : ANIMATED_SVGS;
     const svgContent = svgMap[filename];
 
     if (svgContent) {
       return (
         <span
-          className={cn("select-none inline-flex items-center justify-center [&_svg]:w-full [&_svg]:h-full [&_svg]:block", className)}
+          className={cn(
+            "select-none inline-flex items-center justify-center [&_svg]:w-full [&_svg]:h-full [&_svg]:block", 
+            style === 'static' && "static-weather-icon-wrapper",
+            className
+          )}
           style={{ 
             transform: `scale(${scale})`, 
             transformOrigin: 'center'
@@ -527,6 +575,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
   const getColor = () => {
     // Default to app text for outline unless explicitly asked to be coloured
     if (style === 'outline' && !forceColoured) {
+      if (className?.includes('text-')) return '';
       return 'text-app-text';
     }
 

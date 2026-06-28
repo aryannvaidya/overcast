@@ -139,7 +139,7 @@ const Section = ({ title, children, lang = 'en' }: { title: string; children: Re
   return (
     <div className="mb-8">
       <h3 className="text-[11px] font-semibold tracking-[0.1em] text-white/45 uppercase mb-3 px-1">{transTitle}</h3>
-      <div className={cn("overflow-hidden divide-y divide-white/[0.06]", "bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px]")}>
+      <div className={cn("overflow-hidden divide-y divide-white/[0.06]", "bg-white/[0.04] border border-white/[0.08] rounded-[24px]")}>
         {children}
       </div>
     </div>
@@ -194,8 +194,8 @@ const ToggleRow = ({ label, description, value, onToggle, hapticEnabled, lang = 
   );
 };
 
-const SegmentedControl = ({ value, options, onChange, hapticEnabled, lang = 'en' }: { value: string; options: { label: any; value: string }[], onChange: (val: any) => void; hapticEnabled: boolean; layoutId?: string; lang?: string }) => {
-  const colorTheme = typeof document !== 'undefined' ? (document.documentElement.getAttribute('data-color-theme') || 'green') : 'green';
+const SegmentedControl = ({ value, options, onChange, hapticEnabled, lang = 'en', colorTheme: propColorTheme }: { value: string; options: { label: any; value: string }[], onChange: (val: any) => void; hapticEnabled: boolean; layoutId?: string; lang?: string; colorTheme?: string }) => {
+  const colorTheme = propColorTheme || (typeof document !== 'undefined' ? (document.documentElement.getAttribute('data-color-theme') || 'green') : 'green');
   
   return (
     <div className="flex gap-2 w-full">
@@ -215,12 +215,12 @@ const SegmentedControl = ({ value, options, onChange, hapticEnabled, lang = 'en'
               "flex-1 py-1.5 flex items-center justify-center rounded-full transition-all duration-200 relative select-none font-sans active:scale-[0.97] min-h-[44px]",
               colorTheme === 'midnight'
                 ? (isSelected 
-                  ? "bg-neutral-900 border border-neutral-800 text-white shadow-md font-sans font-medium" 
+                  ? "bg-neutral-900 border border-neutral-800 text-pure-white shadow-md font-sans font-medium" 
                   : "bg-black/[0.3] border border-white/[0.04] text-white/50 hover:bg-neutral-900/50 hover:text-white"
                   )
                 : colorTheme === 'monochrome'
                 ? (isSelected 
-                  ? "bg-black text-white shadow-md border border-black font-sans font-medium" 
+                  ? "bg-black text-pure-white shadow-md border border-black font-sans font-medium" 
                   : "bg-black/[0.05] border border-black/[0.02] text-neutral-500 hover:bg-black/[0.1] hover:text-black"
                   )
                 : (isSelected 
@@ -241,7 +241,7 @@ const SegmentedControl = ({ value, options, onChange, hapticEnabled, lang = 'en'
   );
 };
 
-const SelectRow = ({ label, value, options, onChange, hapticEnabled, lang = 'en' }: { label: string; value: string; options: { label: any; value: string }[], onChange: (val: any) => void; hapticEnabled: boolean; lang?: string }) => {
+const SelectRow = ({ label, value, options, onChange, hapticEnabled, lang = 'en', colorTheme }: { label: string; value: string; options: { label: any; value: string }[], onChange: (val: any) => void; hapticEnabled: boolean; lang?: string; colorTheme?: string }) => {
   const transLabel = useTranslatedText(label, lang);
   return (
     <div className="px-5 py-4 pb-5 flex flex-col gap-3">
@@ -254,6 +254,7 @@ const SelectRow = ({ label, value, options, onChange, hapticEnabled, lang = 'en'
         onChange={onChange} 
         hapticEnabled={hapticEnabled} 
         lang={lang}
+        colorTheme={colorTheme}
       />
     </div>
   );
@@ -762,10 +763,10 @@ const SettingsScreen = ({
       'forecast',
       'aqi',
       'uv',
-      'sunMoon',
+      'pollen',
       'humidityVisibility',
       'precipitationWind',
-      'pollen'
+      'sunMoon'
     ];
     const filtered = fullOrder.filter(k => k !== 'rainGraph' && k !== 'forecast');
     // Simple deep equal check to avoid resetting state while dragging
@@ -790,6 +791,13 @@ const SettingsScreen = ({
   const [showLanguagePage, setShowLanguagePage] = useState(false);
   const [pushStatus, setPushStatus] = useState<'idle' | 'registering' | 'synced' | 'error' | 'denied'>('idle');
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const sourcesScrollRef = React.useRef<HTMLDivElement>(null);
+  const tilesScrollRef = React.useRef<HTMLDivElement>(null);
+  const alertsScrollRef = React.useRef<HTMLDivElement>(null);
+  const unitsScrollRef = React.useRef<HTMLDivElement>(null);
+  const generalScrollRef = React.useRef<HTMLDivElement>(null);
+  const languageScrollRef = React.useRef<HTMLDivElement>(null);
+  const subviewScrollRef = React.useRef<HTMLDivElement>(null);
   const mainScrollRef = React.useRef<HTMLDivElement>(null);
   const savedMainScrollPos = React.useRef<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -977,10 +985,14 @@ const SettingsScreen = ({
   useEffect(() => {
     if (showDataSources || showTilesCustomisation || activeSubView !== 'none' || showAlertPage || showUnitPage || showGeneralPage || showLanguagePage) {
       const resetScroll = () => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = 0;
-          scrollRef.current.scrollLeft = 0;
-        }
+        if (scrollRef.current) { scrollRef.current.scrollTop = 0; scrollRef.current.scrollLeft = 0; }
+        if (sourcesScrollRef.current) { sourcesScrollRef.current.scrollTop = 0; sourcesScrollRef.current.scrollLeft = 0; }
+        if (tilesScrollRef.current) { tilesScrollRef.current.scrollTop = 0; tilesScrollRef.current.scrollLeft = 0; }
+        if (alertsScrollRef.current) { alertsScrollRef.current.scrollTop = 0; alertsScrollRef.current.scrollLeft = 0; }
+        if (unitsScrollRef.current) { unitsScrollRef.current.scrollTop = 0; unitsScrollRef.current.scrollLeft = 0; }
+        if (generalScrollRef.current) { generalScrollRef.current.scrollTop = 0; generalScrollRef.current.scrollLeft = 0; }
+        if (languageScrollRef.current) { languageScrollRef.current.scrollTop = 0; languageScrollRef.current.scrollLeft = 0; }
+        if (subviewScrollRef.current) { subviewScrollRef.current.scrollTop = 0; subviewScrollRef.current.scrollLeft = 0; }
         window.scrollTo(0, 0);
         
         // Direct DOM access to ensure absolute top-alignment
@@ -1064,7 +1076,7 @@ const SettingsScreen = ({
     }
     onUpdateDebouncedRef.current = setTimeout(() => {
       onUpdate(newSettings);
-    }, 200);
+    }, 800);
 
     // Schedule side effects on the next tick so the UI update is fully synchronous & lag-free
     setTimeout(() => {
@@ -1105,10 +1117,10 @@ const SettingsScreen = ({
       'forecast',
       'aqi',
       'uv',
-      'sunMoon',
+      'pollen',
       'humidityVisibility',
       'precipitationWind',
-      'pollen'
+      'sunMoon'
     ];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= order.length) return;
@@ -1160,7 +1172,7 @@ const SettingsScreen = ({
                   flushUpdates();
                   onClose();
                 }}
-                className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
+                className="w-12 h-12 bg-app-surface border border-app-border flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
               >
                 <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
               </button>
@@ -1180,7 +1192,7 @@ const SettingsScreen = ({
                 <div className="flex items-center gap-3.5">
                   <Eye className="w-5 h-5 text-white/50" strokeWidth={1.8} />
                   <p className="text-[15px] font-medium text-white tracking-tight font-sans">
-                    <Translate text="Appearance" lang={localSettings.language} />
+                    <Translate text="General" lang={localSettings.language} />
                   </p>
                 </div>
                 <Icons.ChevronRight className="w-4 h-4 text-white/15" />
@@ -1188,7 +1200,7 @@ const SettingsScreen = ({
             </div>
 
             {/* Group 2: Units & Alerts & thresholds subpages */}
-            <div className="w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] divide-y divide-white/[0.06] mb-5 overflow-hidden">
+            <div className="w-full bg-white/[0.04] border border-white/[0.08] rounded-[24px] divide-y divide-white/[0.06] mb-5 overflow-hidden">
               <button 
                 onClick={() => {
                   Haptic.medium(localSettings.hapticEnabled);
@@ -1225,7 +1237,7 @@ const SettingsScreen = ({
             </div>
 
             {/* Group 3: Data Source, Rate, T&C, Privacy, Report Bug */}
-            <div className="w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] divide-y divide-white/[0.06] mb-6 overflow-hidden">
+            <div className="w-full bg-white/[0.04] border border-white/[0.08] rounded-[24px] divide-y divide-white/[0.06] mb-6 overflow-hidden">
               <button 
                 onClick={() => {
                   Haptic.medium(localSettings.hapticEnabled);
@@ -1302,85 +1314,89 @@ const SettingsScreen = ({
         {showDataSources && (
           <motion.div 
             key="settings-data-sources-panel"
-            ref={scrollRef}
+            ref={sourcesScrollRef}
             id="sources-page"
             data-no-swipe
             initial={{ x: "100%" }}
-            animate={{ x: 0 }}
+            animate={{ x: "0%" }}
             exit={{ x: "100%" }}
-            transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             style={{ willChange: "transform" }}
-            className="fixed inset-0 z-[1010] bg-app-bg/90 backdrop-blur-3xl overflow-y-auto overscroll-contain sources-page touch-pan-y"
+            className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain sources-page touch-pan-y transform-gpu pointer-events-auto"
           >
-            <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
-              <header className="flex items-center justify-between mb-8 px-1 h-10 w-full">
-                <h1 className="text-[28px] font-bold text-app-text tracking-tight animate-fade-in">
-                  <Translate text="Sources" lang={localSettings.language} />
-                </h1>
-                <motion.button 
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  onClick={() => {
-                    Haptic.light(localSettings.hapticEnabled);
-                    setShowDataSources(false);
-                    handleBack();
-                  }}
-                  className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md rounded-full flex items-center justify-center text-app-text hover:bg-app-surface/80 transition-all shadow-xl select-none"
-                >
-                  <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
-                </motion.button>
-              </header>
+              <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
+                <header className="flex items-center justify-between mb-8 px-1 h-10 w-full">
+                  <h1 className="text-[28px] font-bold text-app-text tracking-tight animate-fade-in">
+                    <Translate text="Sources" lang={localSettings.language} />
+                  </h1>
+                  <motion.button 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    onClick={() => {
+                      Haptic.light(localSettings.hapticEnabled);
+                      setShowDataSources(false);
+                      handleBack();
+                    }}
+                    className="w-12 h-12 bg-app-surface border border-app-border rounded-full flex items-center justify-center text-app-text hover:bg-app-surface/80 transition-all shadow-xl select-none"
+                  >
+                    <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
+                  </motion.button>
+                </header>
 
-              <div className="flex flex-col items-center px-0 w-full">
-                 <div className="w-full bg-app-surface border border-app-border rounded-[24px] divide-y divide-app-border mb-10 overflow-hidden font-sans shadow-2xl">
-                    <SourceCard 
-                      title="Open-Meteo" 
-                      subtitle="High-resolution global weather forecasts, hourly UV Index modeling, and local temperature projections." 
-                      url="https://open-meteo.com/" 
-                      hapticEnabled={localSettings.hapticEnabled} 
-                    />
-                    <SourceCard 
-                      title="WAQI (AQI)" 
-                      subtitle="Real-time, hyper-local PM2.5, PM10, and ozone monitoring from official stations globally." 
-                      url="https://waqi.info/" 
-                      hapticEnabled={localSettings.hapticEnabled} 
-                    />
-                    <SourceCard 
-                      title="Windy.com" 
-                      subtitle="Interactive composite weather radar mapping tiles, wind vectors, and meteorological modeling visualizations." 
-                      url="https://www.windy.com/" 
-                      hapticEnabled={localSettings.hapticEnabled} 
-                    />
-                    <SourceCard 
-                      title="OpenStreetMap" 
-                      subtitle="Precise device reverse coordinate translation to match human-readable city labels." 
-                      url="https://www.openstreetmap.org/" 
-                      hapticEnabled={localSettings.hapticEnabled} 
-                    />
-                 </div>
+                <div className="flex flex-col items-center px-0 w-full">
+                   <div className="w-full bg-app-surface border border-app-border rounded-[24px] divide-y divide-app-border mb-10 overflow-hidden font-sans shadow-2xl">
+                      <SourceCard 
+                        title="Open-Meteo" 
+                        subtitle="High-resolution global weather forecasts, hourly UV Index modeling, and local temperature projections." 
+                        url="https://open-meteo.com/" 
+                        hapticEnabled={localSettings.hapticEnabled} 
+                        lang={localSettings.language}
+                      />
+                      <SourceCard 
+                        title="WAQI (AQI)" 
+                        subtitle="Real-time, hyper-local PM2.5, PM10, and ozone monitoring from official stations globally." 
+                        url="https://waqi.info/" 
+                        hapticEnabled={localSettings.hapticEnabled} 
+                        lang={localSettings.language}
+                      />
+                      <SourceCard 
+                        title="Windy.com" 
+                        subtitle="Interactive composite weather radar mapping tiles, wind vectors, and meteorological modeling visualizations." 
+                        url="https://www.windy.com/" 
+                        hapticEnabled={localSettings.hapticEnabled} 
+                        lang={localSettings.language}
+                      />
+                      <SourceCard 
+                        title="OpenStreetMap" 
+                        subtitle="Precise device reverse coordinate translation to match human-readable city labels." 
+                        url="https://www.openstreetmap.org/" 
+                        hapticEnabled={localSettings.hapticEnabled} 
+                        lang={localSettings.language}
+                      />
+                   </div>
+                </div>
+                
+                {/* Footer */}
+                <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center w-full">
+                  <p className="text-[12px] font-semibold text-app-text-dim opacity-40 tracking-tight">&copy; 2026 Overcast</p>
+                </div>
               </div>
-              
-              {/* Footer */}
-              <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center w-full">
-                <p className="text-[12px] font-semibold text-app-text-dim opacity-40 tracking-tight">&copy; 2026 Overcast</p>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
         )}
 
         {showTilesCustomisation && (
           <motion.div 
             key="settings-tiles-customisation-panel"
-            ref={scrollRef}
+            ref={tilesScrollRef}
             id="tiles-page"
             data-no-swipe
             initial={{ x: "100%" }}
-            animate={{ x: 0 }}
+            animate={{ x: "0%" }}
             exit={{ x: "100%" }}
-            transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             style={{ willChange: "transform" }}
-            className="fixed inset-0 z-[1015] bg-app-bg backdrop-blur-3xl overflow-y-auto overscroll-contain tiles-page touch-pan-y"
+            className="fixed inset-0 z-[1015] bg-app-bg overflow-y-auto overscroll-contain tiles-page touch-pan-y transform-gpu pointer-events-auto"
           >
             <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
               <header className="flex items-center justify-between mb-8 px-1 w-full font-sans">
@@ -1392,7 +1408,7 @@ const SettingsScreen = ({
                     Haptic.light(localSettings.hapticEnabled);
                     handleBack();
                   }}
-                  className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
+                  className="w-12 h-12 bg-app-surface border border-app-border flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
                 >
                   <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
                 </button>
@@ -1530,7 +1546,7 @@ const SettingsScreen = ({
                           updateSetting('tileOrder', ['rainGraph', 'forecast', ...newOrder]);
                         }, 300);
                       }}
-                      className="flex flex-col bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-[24px] overflow-hidden select-none"
+                      className="flex flex-col bg-white/[0.04] border border-white/[0.08] rounded-[24px] overflow-hidden select-none"
                     >
                       {customTileOrder.map((key) => {
                         const tile = tileLabels[key];
@@ -1572,15 +1588,15 @@ const SettingsScreen = ({
         {showAlertPage && (
           <motion.div 
             key="settings-alerts-panel"
-            ref={scrollRef}
+            ref={alertsScrollRef}
             id="alerts-page"
             data-no-swipe
             initial={{ x: "100%" }}
-            animate={{ x: 0 }}
+            animate={{ x: "0%" }}
             exit={{ x: "100%" }}
-            transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             style={{ willChange: "transform" }}
-            className="fixed inset-0 z-[1010] bg-app-bg backdrop-blur-3xl overflow-y-auto overscroll-contain alerts-page touch-pan-y"
+            className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain alerts-page touch-pan-y transform-gpu pointer-events-auto"
           >
             <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
               <header className="flex items-center justify-between mb-8 px-1 w-full font-sans">
@@ -1593,7 +1609,7 @@ const SettingsScreen = ({
                     setShowAlertPage(false);
                     handleBack();
                   }}
-                  className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
+                  className="w-12 h-12 bg-app-surface border border-app-border flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
                 >
                   <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
                 </button>
@@ -1659,15 +1675,15 @@ const SettingsScreen = ({
         {showUnitPage && (
           <motion.div 
             key="settings-units-panel"
-            ref={scrollRef}
+            ref={unitsScrollRef}
             id="units-page"
             data-no-swipe
             initial={{ x: "100%" }}
-            animate={{ x: 0 }}
+            animate={{ x: "0%" }}
             exit={{ x: "100%" }}
-            transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             style={{ willChange: "transform" }}
-            className="fixed inset-0 z-[1010] bg-app-bg backdrop-blur-3xl overflow-y-auto overscroll-contain units-page touch-pan-y"
+            className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain units-page touch-pan-y transform-gpu pointer-events-auto"
           >
             <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
               <header className="flex items-center justify-between mb-8 px-1 w-full font-sans">
@@ -1680,7 +1696,7 @@ const SettingsScreen = ({
                     setShowUnitPage(false);
                     handleBack();
                   }}
-                  className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
+                  className="w-12 h-12 bg-app-surface border border-app-border flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
                 >
                   <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
                 </button>
@@ -1691,6 +1707,7 @@ const SettingsScreen = ({
                   label="Temperature" 
                   value={localSettings.unitTemp} 
                   hapticEnabled={localSettings.hapticEnabled}
+                  colorTheme={localSettings.colorTheme}
                   options={[
                     { label: '°C', value: 'C' },
                     { label: '°F', value: 'F' }
@@ -1702,6 +1719,7 @@ const SettingsScreen = ({
                   label="Wind" 
                   value={localSettings.unitWind} 
                   hapticEnabled={localSettings.hapticEnabled}
+                  colorTheme={localSettings.colorTheme}
                   options={[
                     { label: 'km/h', value: 'km/h' },
                     { label: 'mph', value: 'mph' },
@@ -1714,6 +1732,7 @@ const SettingsScreen = ({
                   label="Visibility" 
                   value={localSettings.unitVisibility} 
                   hapticEnabled={localSettings.hapticEnabled}
+                  colorTheme={localSettings.colorTheme}
                   options={[
                     { label: 'km', value: 'km' },
                     { label: 'mi', value: 'miles' }
@@ -1725,6 +1744,7 @@ const SettingsScreen = ({
                   label="Time Format" 
                   value={localSettings.timeFormat === '24h' ? '24h' : '12h'} 
                   hapticEnabled={localSettings.hapticEnabled}
+                  colorTheme={localSettings.colorTheme}
                   options={[
                     { label: '12-hour', value: '12h' },
                     { label: '24-hour', value: '24h' }
@@ -1740,21 +1760,21 @@ const SettingsScreen = ({
         {showGeneralPage && (
           <motion.div 
             key="settings-general-panel"
-            ref={scrollRef}
+            ref={generalScrollRef}
             id="general-page"
             data-no-swipe
             initial={{ x: "100%" }}
-            animate={{ x: 0 }}
+            animate={{ x: "0%" }}
             exit={{ x: "100%" }}
-            transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             style={{ willChange: "transform" }}
-            className="fixed inset-0 z-[1010] bg-app-bg backdrop-blur-3xl overflow-y-auto overscroll-contain general-page touch-pan-y"
+            className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain general-page touch-pan-y transform-gpu pointer-events-auto"
           >
             <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
               <header className="flex flex-col mb-8 px-1 w-full font-sans">
                 <div className="flex items-center justify-between w-full mb-1">
                   <h1 className="text-[28px] font-bold text-white tracking-tight leading-none">
-                    <Translate text="Appearance" lang={localSettings.language} />
+                    <Translate text="General" lang={localSettings.language} />
                   </h1>
                   <button
                     onClick={() => {
@@ -1762,7 +1782,7 @@ const SettingsScreen = ({
                       setShowGeneralPage(false);
                       handleBack();
                     }}
-                    className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer shrink-0"
+                    className="w-12 h-12 bg-app-surface border border-app-border flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer shrink-0"
                   >
                     <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
                   </button>
@@ -1775,11 +1795,11 @@ const SettingsScreen = ({
               {/* Card: Theme Color Preset */}
               <div className="mb-5 font-sans">
                 <h3 className="text-[11px] font-semibold tracking-[0.1em] text-white/45 uppercase mb-3 px-1">
-                  <Translate text="Appearance" lang={localSettings.language || 'en'} />
+                  <Translate text="General" lang={localSettings.language || 'en'} />
                 </h3>
 
                 {/* Selection Circle Grid */}
-                <div className="p-5 w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] overflow-hidden">
+                <div className="p-5 w-full bg-white/[0.04] border border-white/[0.08] rounded-[24px] overflow-hidden">
                   <div className="grid grid-cols-4 gap-x-2 gap-y-6 py-2">
                     {[
                       { id: 'monochrome' as const, label: 'White', color: '#ffffff' },
@@ -1829,11 +1849,12 @@ const SettingsScreen = ({
               </div>
 
               {/* Group 1: Icon Style */}
-              <div className="w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] divide-y divide-white/[0.06] mb-5 overflow-hidden">
+              <div className="w-full bg-white/[0.04] border border-white/[0.08] rounded-[24px] divide-y divide-white/[0.06] mb-5 overflow-hidden">
                 <SelectRow 
                   label="Icon Style" 
                   value={localSettings.iconStyle || 'outline'} 
                   hapticEnabled={localSettings.hapticEnabled}
+                  colorTheme={localSettings.colorTheme}
                   options={[
                     { 
                       label: (
@@ -1841,9 +1862,13 @@ const SettingsScreen = ({
                           <WeatherIcon 
                             name="Sun" 
                             style="outline" 
+                            isSettingsPreview={true}
+                            bypassDelay={true}
                             className={cn(
                               "w-[30px] h-[30px] transition-colors duration-200", 
-                              (localSettings.iconStyle || 'outline') === 'outline' ? "text-black animate-none" : "text-white/50 animate-none"
+                              (localSettings.iconStyle || 'outline') === 'outline'
+                                ? ((localSettings.colorTheme || 'green') === 'pink' ? "text-black animate-none" : "text-pure-white animate-none")
+                                : "text-white/50 animate-none"
                             )} 
                           />
                         </div>
@@ -1856,9 +1881,13 @@ const SettingsScreen = ({
                           <WeatherIcon 
                             name="Sun" 
                             style="animated_outline" 
+                            isSettingsPreview={true}
+                            bypassDelay={true}
                             className={cn(
                               "w-[30px] h-[30px] transition-all duration-200", 
-                              (localSettings.iconStyle || 'outline') === 'animated_outline' ? "scale-110 text-black" : "opacity-50 text-white/50"
+                              (localSettings.iconStyle || 'outline') === 'animated_outline'
+                                ? ((localSettings.colorTheme || 'green') === 'pink' ? "scale-110 text-black" : "scale-110 text-pure-white")
+                                : "opacity-50 text-white/50"
                             )} 
                           />
                         </div>
@@ -1871,6 +1900,8 @@ const SettingsScreen = ({
                           <WeatherIcon 
                             name="Sun" 
                             style="static" 
+                            isSettingsPreview={true}
+                            bypassDelay={true}
                             className={cn(
                               "w-[30px] h-[30px] transition-all duration-200", 
                               (localSettings.iconStyle || 'outline') === 'static' ? "scale-110" : "opacity-50"
@@ -1886,6 +1917,8 @@ const SettingsScreen = ({
                           <WeatherIcon 
                             name="Sun" 
                             style="animated" 
+                            isSettingsPreview={true}
+                            bypassDelay={true}
                             className={cn(
                               "w-[30px] h-[30px] transition-all duration-200", 
                               (localSettings.iconStyle || 'outline') === 'animated' ? "scale-110" : "opacity-50"
@@ -1906,7 +1939,7 @@ const SettingsScreen = ({
                 <h3 className="text-[11px] font-semibold tracking-[0.1em] text-white/45 uppercase mb-3 px-1">
                   <Translate text="Layout Configuration" lang={localSettings.language || 'en'} />
                 </h3>
-                <div className="flex flex-col gap-3.5 py-5 px-5 w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] overflow-hidden">
+                <div className="flex flex-col gap-3.5 py-5 px-5 w-full bg-white/[0.04] border border-white/[0.08] rounded-[24px] overflow-hidden">
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2.5">
                       <div className="flex items-center justify-between">
@@ -1917,6 +1950,7 @@ const SettingsScreen = ({
                       <SegmentedControl 
                         value={localSettings.layoutWeatherDetail || 'detailed'} 
                         hapticEnabled={localSettings.hapticEnabled}
+                        colorTheme={localSettings.colorTheme}
                         options={[
                           { label: 'Detailed', value: 'detailed' },
                           { label: 'Compact', value: 'compact' }
@@ -1935,6 +1969,7 @@ const SettingsScreen = ({
                       <SegmentedControl 
                         value={localSettings.layoutHourlyForecast || 'detailed'} 
                         hapticEnabled={localSettings.hapticEnabled}
+                        colorTheme={localSettings.colorTheme}
                         options={[
                           { label: 'Detailed graph', value: 'detailed' },
                           { label: 'Compact tiles', value: 'compact' }
@@ -1953,6 +1988,7 @@ const SettingsScreen = ({
                       <SegmentedControl 
                         value={localSettings.layoutDailyForecast || 'detailed'} 
                         hapticEnabled={localSettings.hapticEnabled}
+                        colorTheme={localSettings.colorTheme}
                         options={[
                           { label: 'Detailed bars', value: 'detailed' },
                           { label: 'Compact list', value: 'compact' }
@@ -1966,7 +2002,7 @@ const SettingsScreen = ({
               </div>
 
               {/* Group 2: App Preferences (Consolidated) */}
-              <div className="w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] divide-y divide-white/[0.06] mb-5 overflow-hidden font-sans">
+              <div className="w-full bg-white/[0.04] border border-white/[0.08] rounded-[24px] divide-y divide-white/[0.06] mb-5 overflow-hidden font-sans">
                 <LinkRow 
                   label="Tiles Customisation" 
                   hapticEnabled={localSettings.hapticEnabled}
@@ -2011,15 +2047,15 @@ const SettingsScreen = ({
         {showLanguagePage && (
           <motion.div 
             key="settings-language-panel"
-            ref={scrollRef}
+            ref={languageScrollRef}
             id="language-page"
             data-no-swipe
             initial={{ x: "100%" }}
-            animate={{ x: 0 }}
+            animate={{ x: "0%" }}
             exit={{ x: "100%" }}
-            transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             style={{ willChange: "transform" }}
-            className="fixed inset-0 z-[1015] bg-app-bg backdrop-blur-3xl overflow-y-auto overscroll-contain language-page touch-pan-y"
+            className="fixed inset-0 z-[1015] bg-app-bg overflow-y-auto overscroll-contain language-page touch-pan-y transform-gpu pointer-events-auto"
           >
             <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
               <header className="flex items-center justify-between mb-8 px-1 w-full font-sans">
@@ -2032,13 +2068,13 @@ const SettingsScreen = ({
                     setShowLanguagePage(false);
                     handleBack();
                   }}
-                  className="w-12 h-12 bg-app-surface border border-app-border backdrop-blur-md flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
+                  className="w-12 h-12 bg-app-surface border border-app-border flex items-center justify-center rounded-full hover:bg-app-surface/80 transition-all shadow-xl select-none cursor-pointer"
                 >
                   <Icons.ChevronLeft className="w-5.5 h-5.5 text-app-text" strokeWidth={2.5} />
                 </button>
               </header>
 
-              <div className="w-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md rounded-[24px] divide-y divide-white/[0.06] overflow-hidden font-sans">
+              <div className="w-full bg-white/[0.04] border border-white/[0.08] rounded-[24px] divide-y divide-white/[0.06] overflow-hidden font-sans">
                 {LANGUAGES.map((lang) => {
                   const isSelected = (localSettings.language || 'en') === lang.value;
                   return (
@@ -2083,7 +2119,7 @@ const SettingsScreen = ({
               ease: [0.25, 0.46, 0.45, 0.94]
             }}
             style={{ willChange: "transform" }}
-            className="fixed inset-0 z-[1020] bg-app-bg/90 backdrop-blur-3xl overflow-y-auto overscroll-contain subview-page touch-pan-y"
+            className="fixed inset-0 z-[1020] bg-app-bg overflow-y-auto overscroll-contain subview-page touch-pan-y transform-gpu"
           >
             <div className="max-w-[390px] mx-auto min-h-screen px-6 pt-[calc(env(safe-area-inset-top,24px)+56px)] pb-32">
               <header className="flex items-center justify-between mb-6 px-1 w-full">
@@ -2222,14 +2258,14 @@ const SettingsScreen = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[2020] flex items-center justify-center p-6 bg-app-bg/65 backdrop-blur-md"
+              className="fixed inset-0 z-[2020] flex items-center justify-center p-6 bg-app-bg/85"
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.92, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.92, y: 20 }}
                 transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                className="relative w-full max-w-[340px] bg-app-surface border border-app-border rounded-[32px] p-6 text-center select-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] backdrop-blur-3xl font-sans"
+                className="relative w-full max-w-[340px] bg-app-surface border border-app-border rounded-[32px] p-6 text-center select-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] font-sans"
               >
                 {/* Central rounded heart badge intersecting the top border */}
                 <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 bg-app-text text-app-bg rounded-full flex items-center justify-center border border-app-border shadow-lg">
@@ -2323,13 +2359,13 @@ const SettingsScreen = ({
 
         {/* GitHub Contribution/Star Centered Modal Card */}
         {githubToast && (
-          <div className="fixed inset-0 z-[2030] flex items-center justify-center p-6 bg-app-bg/65 backdrop-blur-md">
+          <div className="fixed inset-0 z-[2030] flex items-center justify-center p-6 bg-app-bg/85">
             <motion.div 
               initial={{ opacity: 0, scale: 0.92, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 15 }}
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
-              className="relative w-full max-w-[320px] bg-app-surface border border-app-border rounded-[32px] p-6 text-center select-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] backdrop-blur-3xl font-sans"
+              className="relative w-full max-w-[320px] bg-app-surface border border-app-border rounded-[32px] p-6 text-center select-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] font-sans"
             >
               <div className="w-12 h-12 bg-app-text/[0.08] rounded-full flex items-center justify-center mx-auto mb-4 border border-app-border">
                 <Star className="w-6 h-6 text-yellow-500 fill-yellow-500" />

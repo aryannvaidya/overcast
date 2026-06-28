@@ -245,10 +245,10 @@ export default function SunPath({ weather, settings }: SunPathProps) {
   const isIconVisible = cycleProgress > 0 && cycleProgress < 1;
 
   return (
-    <div className="flex flex-col px-0 -mx-[21px] md:-mx-[21px]">
+    <div className="flex flex-col px-0 -mx-[1rem] sm:-mx-[1.3125rem]">
       <div 
         ref={containerRef} 
-        className="w-full max-w-[335px] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[32px] pt-4 pb-0 px-5 flex flex-col gap-0 overflow-hidden shadow-2xl relative group select-none"
+        className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] pt-[1rem] pb-0 px-[1rem] sm:px-[1.25rem] flex flex-col gap-0 overflow-hidden shadow-2xl relative group select-none"
       >
         <style>{`
           .scenery-canvas {
