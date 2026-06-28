@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <img src="assest/preview/overcast.png" width="40%">
 </p>
@@ -118,7 +120,7 @@ Just open index.html in any browser.
 ## 📂Project Structure
 
 ```
-vayu-weather/
+overcast/
 │
 └── index.html       # Entire app — HTML + CSS + JS in one file
 └── README.md
@@ -150,4 +152,5 @@ This project is licensed under the MIT License.
    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=aryannvaidya/overcast&type=date&legend=top-left" />
  </picture>
 </a>
+
 
