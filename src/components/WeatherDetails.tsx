@@ -609,9 +609,9 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
 
   const startAng = -115;
   const endAng = 115;
-  const radius = 52;
+  const radius = 58;
   const cxVal = 80;
-  const cyVal = 62;
+  const cyVal = 64;
 
   const windPrc = Math.min(1.0, Math.max(0, windVal / maxWindLimit));
   const targetAngle = startAng + windPrc * (endAng - startAng);
@@ -653,7 +653,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
 
   const getWindSeverityRating = (ms: number) => {
     if (ms < 3.4) return 'Low';
-    if (ms < 8.0) return 'Medium';
+    if (ms < 8.0) return 'Moderate';
     if (ms < 13.9) return 'High';
     return 'Very High';
   };
@@ -792,7 +792,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                     return (
                       <span 
                         key={tick.val} 
-                        className={`absolute leading-none text-app-text/45 font-[300] text-[11px] ${translateClass}`}
+                        className={`absolute leading-none text-app-text/75 font-semibold text-[11px] ${translateClass}`}
                         style={{ left: `${tick.pct}%` }}
                       >
                         {tick.val}
@@ -1207,7 +1207,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                     style={{ width: `${Math.min(100, (numericVis / 20) * 100)}%` }}
                   />
                   <div 
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white dark:bg-neutral-100 rounded-full shadow-[0_1.5px_4px_rgba(0,0,0,0.25)] border border-neutral-300 dark:border-neutral-600 transition-all duration-300"
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[15px] h-[15px] bg-white dark:bg-neutral-100 rounded-full shadow-[0_1.5px_4px_rgba(0,0,0,0.25)] border-[1.5px] border-neutral-300 dark:border-neutral-600 transition-all duration-300"
                     style={{ left: `${Math.min(100, (numericVis / 20) * 100)}%` }}
                   />
                 </div>
@@ -1355,8 +1355,8 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                 </div>
 
                 {/* SVG Gauge block centered & shifted down (removed relative -mt-7) */}
-                <div className="flex flex-col items-center justify-center relative mt-[0.25rem] w-full">
-                  <div className="relative w-full max-w-[8.75rem] aspect-[160/115] mx-auto flex items-center justify-center">
+                <div className="flex flex-col items-center justify-center relative mt-[0.75rem] translate-y-2 w-full">
+                  <div className="relative w-full max-w-[10.5rem] aspect-[160/115] mx-auto flex items-center justify-center">
                     <svg viewBox="0 0 160 115" className="w-full h-full overflow-visible">
                       <defs>
                         {/* Elegant fade-to-opaque gradient targeting pointer end */}
@@ -1370,7 +1370,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                         fill="none"
                         stroke="currentColor"
                         className="text-app-text/10"
-                        strokeWidth="5"
+                        strokeWidth="7"
                         strokeLinecap="round"
                       />
 
@@ -1379,7 +1379,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                           d={activePath}
                           fill="none"
                           stroke="var(--accent-color)"
-                          strokeWidth="5"
+                          strokeWidth="7"
                           strokeLinecap="round"
                           className="transition-all duration-1000 ease-out"
                         />
@@ -1389,19 +1389,21 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                       <circle 
                         cx={tip.x}
                         cy={tip.y}
-                        r="5.5"
-                        fill="var(--accent-color)"
-                        className="transition-all duration-1000 ease-out shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
+                        r="7"
+                        fill="#ffffff"
+                        stroke="#525252"
+                        strokeWidth="1.5"
+                        className="transition-all duration-1000 ease-out stroke-neutral-300 dark:stroke-neutral-600 shadow-[0_1.5px_4px_rgba(0,0,0,0.25)]"
                       />
 
-                      {/* Precise SVG centered text: Thickened to 500 weight and made black (theme app-text) */}
+                      {/* Precise SVG centered text: Font-weight 500 to look bold and clear */}
                       <text 
                         x={cxVal} 
-                        y={cyVal + 3} 
+                        y={cyVal + 11} 
                         textAnchor="middle" 
                         style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 500 }} 
                         fill="currentColor" 
-                        className="text-app-text text-[40px] tracking-tight"
+                        className="text-app-text text-[55px] tracking-tight"
                       >
                         {windVal}
                       </text>
@@ -1409,11 +1411,11 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                       {/* Unit exact inside/under the number */}
                       <text 
                         x={cxVal} 
-                        y={cyVal + 17} 
+                        y={cyVal + 34} 
                         textAnchor="middle" 
-                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 400 }} 
+                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 500 }} 
                         fill="currentColor" 
-                        className="text-app-text-dim/70 text-[12px] tracking-normal uppercase"
+                        className="text-app-text-dim/80 text-[13px] tracking-normal uppercase"
                       >
                         {unitWind}
                       </text>
@@ -1421,44 +1423,35 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                       {/* 0 and Limit markers directly below endpoints */}
                       <text 
                         x={startPt.x} 
-                        y={startPt.y + 15} 
+                        y={startPt.y + 13} 
                         textAnchor="middle" 
-                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 400 }} 
+                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 700 }} 
                         fill="currentColor"
-                        className="text-app-text-dim/60 text-[11px]"
+                        className="text-app-text-dim/80 text-[11px]"
                       >
                         0
                       </text>
 
                       <text 
                         x={endPt.x} 
-                        y={endPt.y + 15} 
+                        y={endPt.y + 13} 
                         textAnchor="middle" 
-                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 400 }} 
+                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 700 }} 
                         fill="currentColor"
-                        className="text-app-text-dim/60 text-[11px]"
+                        className="text-app-text-dim/80 text-[11px]"
                       >
                         {maxWindLimit}
-                      </text>
-
-                      {/* Severity rating positioned perfectly below and extra bolded */}
-                      <text 
-                        x={cxVal} 
-                        y={startPt.y + 20} 
-                        textAnchor="middle" 
-                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif', fontWeight: 900 }} 
-                        fill="var(--accent-color)" 
-                        className="text-[13px] tracking-wider font-black uppercase"
-                      >
-                        {windSeverityRating}
                       </text>
                     </svg>
                   </div>
                 </div>
 
-                {/* Simple direction label centered at the bottom of the card */}
-                <div className="text-center w-full mt-0.5">
-                  <p className="text-[13px] font-semibold text-app-text tracking-wide uppercase">
+                {/* Severity Rating and direction label centered at the bottom of the card */}
+                <div className="text-center w-full flex flex-col items-center gap-0.5 mt-auto">
+                  <p className="text-[13px] font-bold tracking-normal text-app-text-dim" style={{ color: 'var(--accent-color)' }}>
+                    <Translate text={windSeverityRating} lang={settings.language || 'en'} />
+                  </p>
+                  <p className="text-[12px] font-semibold text-app-text tracking-wide uppercase">
                     <Translate text={getCardinalDirection(weather.current.windDirection || 0)} lang={settings.language || 'en'} />
                   </p>
                 </div>

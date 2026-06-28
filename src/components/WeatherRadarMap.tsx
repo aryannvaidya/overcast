@@ -190,6 +190,7 @@ export default function WeatherRadarMap({ activeLocation, onClose, hapticEnabled
             <>
               {/* Live Embed Iframe */}
               <iframe
+                key={embedUrl}
                 id="radar-iframe"
                 src={embedUrl}
                 className="w-full h-full border-0 rounded-[28px] select-none relative z-10"

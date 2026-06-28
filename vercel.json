@@ -1,5 +1,16 @@
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+  "crons": [
+    {
+      "path": "/api/cron-morning",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron-night",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron-alerts",
+      "schedule": "*/30 * * * *"
+    }
   ]
 }

@@ -323,9 +323,11 @@ export default function SunPath({ weather, settings }: SunPathProps) {
               <stop offset="0%" stopColor={isNight ? "#E0F2FE" : "#FFE066"}/>
               <stop offset="100%" stopColor={isNight ? "#38BDF8" : "#FBBF24"}/>
             </linearGradient>
-            <filter id="sunGlow" filterUnits="userSpaceOnUse" x="-100" y="-100" width="740" height="400">
-              <feDropShadow dx="0" dy="0" stdDeviation="15" floodColor={isNight ? "#38BDF8" : "#FBBF24"} floodOpacity="0.65"/>
-            </filter>
+            <radialGradient id="sunGlowGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor={isNight ? "#E0F2FE" : "#FFE066"} stopOpacity={isNight ? "0.3" : "0.5"}/>
+              <stop offset="40%" stopColor={isNight ? "#38BDF8" : "#FBBF24"} stopOpacity={isNight ? "0.1" : "0.18"}/>
+              <stop offset="100%" stopColor={isNight ? "#38BDF8" : "#FBBF24"} stopOpacity="0"/>
+            </radialGradient>
           </defs>
 
           {/* 1. Arc Light Projection removed */}
@@ -347,16 +349,26 @@ export default function SunPath({ weather, settings }: SunPathProps) {
 
           {/* 4. Sun/Moon Dynamic Node Element (Bound directly via SVG cx/cy parameters for pixel-perfect tracking) */}
           {isIconVisible && (
-            <motion.circle 
-              cx={iconX} 
-              cy={iconY} 
-              r="11" 
-              fill="url(#sunColor)" 
-              filter="url(#sunGlow)"
+            <motion.g
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.15 }}
-            />
+            >
+              {/* Radial Glow Circle */}
+              <motion.circle 
+                cx={iconX} 
+                cy={iconY} 
+                r="18" 
+                fill="url(#sunGlowGrad)" 
+              />
+              {/* Solid Inner Orb */}
+              <motion.circle 
+                cx={iconX} 
+                cy={iconY} 
+                r="11" 
+                fill="url(#sunColor)" 
+              />
+            </motion.g>
           )}
 
           {/* 5. Solid Front Hill: Steep U-Shape Valley raised for larger presence (Y=115, Y=175) */}

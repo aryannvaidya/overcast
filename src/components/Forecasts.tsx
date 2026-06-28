@@ -3,18 +3,12 @@ import { WeatherData, Settings } from '../types';
 import { WeatherIcon } from './WeatherIcons';
 import { getWeatherInfo, getHourlyIcon, shouldShowPrecip, getCurrentHourIndex, parseTimeToAbsoluteDate, getWeatherThemeColor, getCurrentWeatherState } from '../services/weatherService';
 import { t, translateWmoCode, Translate } from '../lib/translations';
-import { formatTemp, formatWind, formatPrecipitation } from '../lib/units';
+import { formatTemp } from '../lib/units';
 import { motion } from 'motion/react';
 import { format, parseISO } from 'date-fns';
 import { cn, GLASS_STYLE_SUBTLE } from '../lib/utils';
 
 import { Haptic } from '../lib/haptics';
-
-const getWindDirectionStr = (deg: number): string => {
-  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const index = Math.round(((deg % 360) / 45)) % 8;
-  return directions[index];
-};
 
 const getColorForTemp = (temp: number): string => {
   const keyframes = [
@@ -123,8 +117,11 @@ function formatHourlyTimeFromISO(timeVal: string | Date, timeZone: string, timeF
 export function HourlyForecast({ weather, settings }: ForecastProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const lastScrollPos = React.useRef(0);
+  const lastActiveIndex = React.useRef(-1);
   const scrollTimeoutRef = React.useRef<any>(null);
   const [showDetailInfo, setShowDetailInfo] = React.useState(false);
+
+  const isDetailed = settings.layoutHourlyForecast !== 'compact';
 
   React.useEffect(() => {
     return () => {
@@ -153,11 +150,17 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
 
     if (!scrollRef.current) return;
     const current = scrollRef.current.scrollLeft;
-    // Trigger haptic every 64px (width of one card)
-    if (Math.abs(current - lastScrollPos.current) > 64) {
+    
+    // Determine card spacing dynamically
+    const itemWidth = isDetailed ? 64 : 76;
+    const index = Math.round(current / itemWidth);
+
+    if (index !== lastActiveIndex.current) {
       Haptic.light(settings.hapticEnabled);
-      lastScrollPos.current = current;
+      lastActiveIndex.current = index;
     }
+    
+    lastScrollPos.current = current;
   };
 
   // Get the city's current local time robustly using its timezone
@@ -195,11 +198,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
         temp: temps_2m[i] ?? 0,
         pop: weather.hourly.precipitationProbability?.[i] ?? 0,
         weatherCode: wcodes[i] ?? 0,
-        isDay,
-        windSpeed: weather.hourly.windSpeed?.[i] ?? 0,
-        windDirection: weather.hourly.windDirection?.[i] ?? 0,
-        precipitation: weather.hourly.precipitation?.[i] ?? 0,
-        uvIndex: weather.hourly.uvIndex?.[i] ?? 0
+        isDay
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
@@ -215,8 +214,6 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
   const themeObj = getWeatherThemeColor(currentInfo.weatherCode, currentInfo.isDay);
   // Theme color for the line and gradient backdrop
   const strokeColor = themeObj?.color || '#22c55e';
-
-  const isDetailed = settings.layoutHourlyForecast !== 'compact';
 
   if (isDetailed) {
     const temps = hourlyData.map(item => item.temp);
@@ -284,61 +281,17 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
               />
               <div 
                 style={{ backgroundColor: 'var(--popup-bg)' }}
-                className="absolute top-[48px] left-[12px] right-[12px] z-40 border border-app-border rounded-[28px] rounded-tr-[10px] p-4 shadow-2xl backdrop-blur-xl animate-fade-in transition-all duration-300 w-[calc(100%-24px)]"
+                className="absolute top-[48px] left-[12px] right-[12px] z-40 border border-app-border rounded-[28px] rounded-tr-[10px] p-4 shadow-2xl backdrop-blur-xl animate-fade-in transition-all duration-300"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div 
                   style={{ backgroundColor: 'var(--popup-bg)' }}
                   className="absolute -top-[6px] right-[6px] w-3 h-3 border-l border-t border-app-border rotate-45 rounded-tl-[4px]" 
                 />
-                
-                <div className="flex items-center justify-between border-b border-app-text/10 pb-2 mb-2">
-                  <span className="text-[13px] font-bold text-app-text tracking-wide uppercase">
-                    {t('hourly_forecast', settings.language)} Details
-                  </span>
-                  <button 
-                    onClick={() => setShowDetailInfo(false)}
-                    className="p-1 hover:bg-white/10 rounded-full transition"
-                    aria-label="Close"
-                  >
-                    <Icons.X className="w-4 h-4 text-app-text/70" />
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-1 max-h-[280px] overflow-y-auto no-scrollbar pr-1 select-none">
-                  {hourlyData.map((item, i) => {
-                    const isNow = i === 0;
-                    const info = getWeatherInfo(item.weatherCode, item.isDay);
-                    const wCodeText = translateWmoCode(item.weatherCode, settings.language || 'en');
-                    const timeStr = isNow ? t('now', settings.language) : formatHourlyTimeFromISO(item.rawTimeStr, weather.timezone, settings.timeFormat);
-                    
-                    return (
-                      <div key={item.rawTimeStr || i} className="flex flex-col gap-1 py-2 border-b border-app-text/5 last:border-none">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-bold text-app-text">{timeStr}</span>
-                            <WeatherIcon name={info.icon as any} style={settings.iconStyle} className="w-5 h-5 shrink-0" strokeWidth={1.8} />
-                            <span className="text-[12px] text-app-text-dim/90 font-medium truncate max-w-[125px]">{wCodeText}</span>
-                          </div>
-                          <span className="text-[14px] font-semibold text-app-text">{formatTemp(item.temp, settings.unitTemp)}°</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1 text-[11px] text-app-text-dim/75 pl-1">
-                          <div className="flex items-center gap-1">
-                            <Icons.Wind className="w-3.5 h-3.5 text-app-text-dim/50 shrink-0" />
-                            <span>{formatWind(item.windSpeed, settings.unitWind)} {settings.unitWind} {getWindDirectionStr(item.windDirection)}</span>
-                          </div>
-                          <div className="flex items-center gap-1 justify-center">
-                            <Icons.Droplet className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                            <span>{item.pop}% ({formatPrecipitation(item.precipitation, settings.unitPrecipitation === 'inches' ? 'in' : 'mm')}{settings.unitPrecipitation === 'inches' ? 'in' : 'mm'})</span>
-                          </div>
-                          <div className="flex items-center gap-1 justify-end">
-                            <Icons.Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span>UV {Math.round(item.uvIndex)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex flex-col gap-2.5">
+                  <p className="text-[13px] leading-relaxed text-app-text font-normal font-sans text-left">
+                    <Translate text="Detailed view is coming soon." lang={settings.language || 'en'} />
+                  </p>
                 </div>
               </div>
             </>
@@ -659,80 +612,17 @@ export function DailyForecast({ weather, settings }: ForecastProps) {
             />
             <div 
               style={{ backgroundColor: 'var(--popup-bg)' }}
-              className="absolute top-[48px] left-[12px] right-[12px] z-40 border border-app-border rounded-[28px] rounded-tr-[10px] p-4 shadow-2xl backdrop-blur-xl animate-fade-in transition-all duration-300 w-[calc(100%-24px)]"
+              className="absolute top-[48px] left-[12px] right-[12px] z-40 border border-app-border rounded-[28px] rounded-tr-[10px] p-4 shadow-2xl backdrop-blur-xl animate-fade-in transition-all duration-300"
               onClick={(e) => e.stopPropagation()}
             >
               <div 
                 style={{ backgroundColor: 'var(--popup-bg)' }}
                 className="absolute -top-[6px] right-[6px] w-3 h-3 border-l border-t border-app-border rotate-45 rounded-tl-[4px]" 
               />
-              
-              <div className="flex items-center justify-between border-b border-app-text/10 pb-2 mb-2">
-                <span className="text-[13px] font-bold text-app-text tracking-wide uppercase">
-                  {t('seven_day_forecast', settings.language)} Details
-                </span>
-                <button 
-                  onClick={() => setShowDetailInfo(false)}
-                  className="p-1 hover:bg-white/10 rounded-full transition"
-                  aria-label="Close"
-                >
-                  <Icons.X className="w-4 h-4 text-app-text/70" />
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-1 max-h-[280px] overflow-y-auto no-scrollbar pr-1 select-none">
-                {(weather?.daily?.time || []).slice(0, 7).map((time, i) => {
-                  const info = getWeatherInfo(weather.daily.weatherCode?.[i] ?? 0);
-                  const date = parseISO(time);
-                  const localDayName = isNaN(date.getTime()) 
-                    ? '---' 
-                    : new Intl.DateTimeFormat(settings.language || 'en', { weekday: 'short' }).format(date);
-                  const cleanedDayName = localDayName.replace(/\./g, '');
-                  const capitalizedDayName = cleanedDayName.charAt(0).toUpperCase() + cleanedDayName.slice(1);
-                  
-                  const dayMin = weather.daily.temperatureMin?.[i] ?? 0;
-                  const dayMax = weather.daily.temperatureMax?.[i] ?? 0;
-                  
-                  const sunriseStr = formatHourlyTimeFromISO(weather.daily.sunrise?.[i] || "", weather.timezone, settings.timeFormat);
-                  const sunsetStr = formatHourlyTimeFromISO(weather.daily.sunset?.[i] || "", weather.timezone, settings.timeFormat);
-
-                  return (
-                    <div key={time} className="flex flex-col gap-1 py-2 border-b border-app-text/5 last:border-none">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[13px] font-bold text-app-text w-[60px] text-left">
-                            {i === 0 ? t('today', settings.language) : capitalizedDayName}
-                          </span>
-                          <WeatherIcon name={info.icon as any} style={settings.iconStyle} className="w-5 h-5 shrink-0" strokeWidth={1.8} />
-                          <span className="text-[12px] text-app-text-dim/90 font-medium truncate max-w-[125px]">
-                            {translateWmoCode(weather.daily.weatherCode?.[i] ?? 0, settings.language || 'en')}
-                          </span>
-                        </div>
-                        <span className="text-[13px] font-semibold text-app-text shrink-0">
-                          <span className="text-app-text-dim">{formatTemp(dayMin, settings.unitTemp)}°</span>
-                          {" / "}
-                          <span>{formatTemp(dayMax, settings.unitTemp)}°</span>
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1 text-[11px] text-app-text-dim/75 pl-1">
-                        <div className="flex items-center gap-0.5">
-                          <span className="opacity-70">🌅</span>
-                          <span>{sunriseStr}</span>
-                        </div>
-                        <div className="flex items-center gap-0.5 justify-center">
-                          <span className="opacity-70">🌇</span>
-                          <span>{sunsetStr}</span>
-                        </div>
-                        <div className="flex items-center gap-1 justify-end">
-                          <Icons.Droplet className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                          <span>{formatPrecipitation(weather.daily.precipitationSum?.[i] ?? 0, settings.unitPrecipitation === 'inches' ? 'in' : 'mm')}{settings.unitPrecipitation === 'inches' ? 'in' : 'mm'}</span>
-                          <Icons.Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>{Math.round(weather.daily.uvIndex?.[i] ?? 0)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex flex-col gap-2.5">
+                <p className="text-[13px] leading-relaxed text-app-text font-normal font-sans text-left">
+                  <Translate text="Detailed view is coming soon." lang={settings.language || 'en'} />
+                </p>
               </div>
             </div>
           </>
@@ -841,9 +731,5 @@ export function DailyForecast({ weather, settings }: ForecastProps) {
 const Icons = {
   ChevronRight: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "2"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-right" {...props}><path d="m9 18 6-6-6-6"/></svg>,
   Calendar: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar" {...props}><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>,
-  Clock: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-clock" {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-  Wind: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wind" {...props}><path d="M12.8 19.6a8.8 8.8 0 1 1 .2-2.2"/><path d="M2 12h11.8"/><path d="M11.3 8.3A5.4 5.4 0 1 1 12 6"/><path d="M2 6h9.8"/><path d="M17.4 12.1a5.4 5.4 0 1 1-.9 3.2"/><path d="M2 18h15.2"/></svg>,
-  Droplet: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-droplet" {...props}><path d="M12 22a7 7 0 0 0 7-7c0-4.3-7-11-7-11S5 10.7 5 15a7 7 0 0 0 7 7z"/></svg>,
-  Sun: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sun" {...props}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>,
-  X: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "2"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+  Clock: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-clock" {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
 };

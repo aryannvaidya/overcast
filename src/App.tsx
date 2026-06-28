@@ -19,7 +19,6 @@ import CityManager from './components/CityManager';
 import WeatherRadarMap from './components/WeatherRadarMap';
 import AlertsDisplay from './components/AlertsDisplay';
 import AtmosphereCanvas from './components/AtmosphereCanvas';
-import { calibrateTemperature } from './services/mlService';
 import { Haptic } from './lib/haptics';
 import { format } from 'date-fns';
 import { Translate, fetchDynamicTranslation } from './lib/translations';
@@ -29,9 +28,7 @@ import {
   applyNotifToggleStates,
   SafeNotif,
   safeOneSignal,
-  tagDeviceLocation,
-  sendNotification,
-  syncUserSettingsToFirebase
+  tagDeviceLocation
 } from './services/oneSignalService';
 
 const DEFAULT_LOCATION: Location | null = null;
@@ -56,11 +53,10 @@ const INITIAL_SETTINGS: Settings = {
   alertDaily: false,
   alertRealtime: false,
   timeFormat: '12h',
-  pushEnabled: true,
+  pushEnabled: false,
   alertMorningSummary: false,
   alertNightSummary: false,
   backgroundGlow: 'on',
-  mlEnabled: true,
   layoutWeatherDetail: 'detailed',
   layoutHourlyForecast: 'detailed',
   layoutDailyForecast: 'compact',
@@ -325,15 +321,13 @@ export default function App() {
       const s = localStorage.getItem('app_settings');
       if (s) {
         const parsed = JSON.parse(s);
-        // Migration: Force light theme and enable push by default
+        // Migration: Force light theme only
         parsed.theme = 'light';
         if (parsed.colorTheme === undefined) parsed.colorTheme = 'blue';
-        parsed.pushEnabled = true;
         if (!parsed.unitPrecipitation) parsed.unitPrecipitation = 'mm';
         if (!parsed.iconStyle) parsed.iconStyle = 'animated';
         if (parsed.iconStyle === '3d') parsed.iconStyle = 'outline';
         if (parsed.iconStyle === 'coloured') parsed.iconStyle = 'animated_outline';
-        if (parsed.mlEnabled === undefined) parsed.mlEnabled = true;
         if (parsed.alertRain === undefined) parsed.alertRain = true;
         if (parsed.backgroundGlow === undefined) parsed.backgroundGlow = 'on';
         if (parsed.layoutWeatherDetail === undefined) parsed.layoutWeatherDetail = 'detailed';
@@ -454,35 +448,9 @@ export default function App() {
   });
 
   const stateRef = useRef(state);
-  const lastNotifiedCityRef = useRef<string>('');
-
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
-
-  // Track current URL path for in-app routing without full page reloads
-  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-
-  useEffect(() => {
-    const onPopState = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => {
-      window.removeEventListener('popstate', onPopState);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      (window as any).deferredPrompt = e;
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
 
   const refreshAQIForIndex = async (index: number) => {
     const locations = stateRef.current.locations;
@@ -624,52 +592,6 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
-
-  // Bridge active location to Android SharedPreferences, sync to Firebase, and trigger travel notifications.
-  useEffect(() => {
-    const city = state.locations[state.activeLocationIndex];
-    const weather = state.weatherData[state.activeLocationIndex];
-    if (city) {
-      const bridge = (window as any).AndroidBridge;
-      if (bridge && typeof bridge.saveLocation === 'function') {
-        try {
-          console.log('[AndroidBridge] Syncing location for widget:', city.name);
-          bridge.saveLocation(city.name, city.latitude, city.longitude);
-        } catch (e) {
-          console.warn('[AndroidBridge] Failed to call saveLocation:', e);
-        }
-      }
-
-      // Sync settings & location to Firebase if playerId is available
-      if (state.settings.oneSignalPlayerId) {
-        syncUserSettingsToFirebase(state.settings.oneSignalPlayerId, state.settings, city);
-      }
-
-      // Trigger location-based travel alerts
-      if (weather && lastNotifiedCityRef.current !== city.name) {
-        lastNotifiedCityRef.current = city.name;
-        
-        const temp = Math.round(weather.current.temperature);
-        const code = weather.current.weatherCode;
-        const isRainy = code >= 51;
-
-        let title = `Heading to ${city.name}? 🎒`;
-        let body = '';
-
-        if (isRainy) {
-          body = `It's rainy today in ${city.name} (${temp}°C). Don't forget to bring an umbrella! ☔🌧️`;
-        } else if (temp >= 28) {
-          body = `It's warm and sunny in ${city.name} (${temp}°C). Perfect day for sunglasses and sunscreen! 🕶️☀️`;
-        } else if (temp <= 15) {
-          body = `It's chilly in ${city.name} (${temp}°C). Make sure to wear a jacket! 🧥❄️`;
-        } else {
-          body = `Nice weather in ${city.name} today (${temp}°C). Enjoy your trip! 🚗✨`;
-        }
-
-        sendNotification(title, body);
-      }
-    }
-  }, [state.activeLocationIndex, state.locations, state.weatherData, state.settings.oneSignalPlayerId]);
 
   // ALSO REFRESH AQI ON CITY SWITCH (if older than 30 min OR never fetched)
   useEffect(() => {
@@ -1022,28 +944,6 @@ export default function App() {
       
       console.log("Current location replaced successfully:", cityName);
       tagDeviceLocation(cityName, lat, lon);
-
-      // Trigger outdoor walking smart alert if push notifications are enabled
-      if (NotifSettings.enabled) {
-        try {
-          const temp = Math.round(data.current?.temperature ?? 0);
-          const weatherCode = data.current?.weatherCode ?? 0;
-          const conditionLabel = getWeatherInfo(weatherCode, data.current?.isDay !== false).label.toLowerCase();
-          const rainProb = data.hourly?.precipitationProbability?.[0] ?? 0;
-          
-          let alertBody = `Now at ${cityName}: ${temp}°C and ${conditionLabel}.`;
-          if (rainProb >= 40) {
-            alertBody += ` 🌧️ Rain is possible (${rainProb}% chance). Grab an umbrella!`;
-          } else {
-            alertBody += ` Clear conditions. Perfect for walking!`;
-          }
-          
-          sendNotification(`🚶 Smart Outdoor Weather Update`, alertBody);
-        } catch (e) {
-          console.warn("Failed sending walking notification:", e);
-        }
-      }
-
       return true;
     } catch (err) {
       console.warn("fetchWeather failed when replacing current location page, keeping previous city:", err);
@@ -2290,44 +2190,8 @@ export default function App() {
     }
   }, [state.activeLocationIndex, state.locations]);
 
-  const rawActiveWeather = state.weatherData[state.activeLocationIndex];
+  const activeWeather = state.weatherData[state.activeLocationIndex];
   const activeLocation = state.locations[state.activeLocationIndex];
-
-  // Dynamically calibrate activeWeather on-the-fly using our ML model if enabled
-  const activeWeather = React.useMemo(() => {
-    if (!rawActiveWeather || !state.settings.mlEnabled || !activeLocation) {
-      return rawActiveWeather;
-    }
-    const cityKey = getCityKey(activeLocation);
-    const riseTime = rawActiveWeather.daily?.sunrise?.[0];
-    const setTime = rawActiveWeather.daily?.sunset?.[0];
-    const currentIsNight = rawActiveWeather.current?.isDay === 0;
-
-    return {
-      ...rawActiveWeather,
-      current: {
-        ...rawActiveWeather.current,
-        temperature: calibrateTemperature(cityKey, rawActiveWeather.current.temperature, currentIsNight),
-        apparentTemperature: calibrateTemperature(cityKey, rawActiveWeather.current.apparentTemperature, currentIsNight),
-      },
-      hourly: {
-        ...rawActiveWeather.hourly,
-        temperature: rawActiveWeather.hourly.temperature.map((t, idx) => {
-          const isNight = isNightHour(rawActiveWeather.hourly.time[idx], riseTime, setTime);
-          return calibrateTemperature(cityKey, t, isNight);
-        }),
-        temperature_2m: rawActiveWeather.hourly.temperature_2m?.map((t, idx) => {
-          const isNight = isNightHour(rawActiveWeather.hourly.time[idx], riseTime, setTime);
-          return calibrateTemperature(cityKey, t, isNight);
-        }) || [],
-      },
-      daily: {
-        ...rawActiveWeather.daily,
-        temperatureMax: rawActiveWeather.daily.temperatureMax.map(t => calibrateTemperature(cityKey, t, false)), // Day max
-        temperatureMin: rawActiveWeather.daily.temperatureMin.map(t => calibrateTemperature(cityKey, t, true)),  // Night min
-      }
-    };
-  }, [rawActiveWeather, state.settings.mlEnabled, activeLocation]);
 
   // Sync background weather gradient on active location/weather data change
   useEffect(() => {
@@ -2948,10 +2812,15 @@ export default function App() {
               setShowCityManager(true);
               pushPanel(() => setShowCityManager(false), 'citymanager');
             }}
+            onOpenRadarMap={() => {
+              Haptic.medium(state.settings.hapticEnabled);
+              setShowRadarMap(true);
+              pushPanel(() => setShowRadarMap(false), 'radarmap');
+            }}
           />
           
           <div className="flex flex-col gap-4">
-            {!(isAnyModalOpen || slideDirection !== null) ? (
+            {slideDirection === null ? (
               <motion.div
                 key="active-tiles-container"
                 initial={{ opacity: 0 }}
@@ -3088,6 +2957,8 @@ export default function App() {
     currentSunrise,
     currentSunset
   ) : false;
+
+  const currentThemeColor = getWeatherThemeColor(currentCode, !currentIsNight);
 
   return (
     <div 
@@ -3286,42 +3157,53 @@ export default function App() {
                       </motion.div>
                     )}
 
-                    {isRefreshing && !isOffline && (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full mt-1.5 bg-app-surface border border-app-border backdrop-blur-md shadow-lg"
-                      >
-                        <Icons.RotateCcw className="w-3 h-3 text-app-text animate-spin" strokeWidth={2.5} />
-                        <span className="text-[10px] font-semibold text-app-text uppercase tracking-wider">
-                          <Translate text="Refreshing..." lang={state.settings.language || 'en'} />
-                        </span>
-                      </motion.div>
-                    )}
-
-                    {state.locations.length > 1 && (
-                      <div id="city-dots" className="flex gap-1.5 mt-2">
-                        {state.locations.map((_, i) => (
-                          <button 
-                            key={i} 
-                            onClick={() => {
-                              if (state.activeLocationIndex !== i) {
-                                Haptic.light(state.settings.hapticEnabled);
-                                const dir = i > state.activeLocationIndex ? 'left' : 'right';
-                                setSlideDirection(dir);
-                                switchToCity(i);
-                              }
-                            }}
-                            className={cn(
-                              "w-1.5 h-1.5 rounded-full transition-all duration-300 pointer-events-auto outline-none focus:outline-none [-webkit-tap-highlight-color:transparent]",
-                              state.activeLocationIndex === i 
-                                ? "bg-app-text w-5 shadow-[0_0_8px_rgba(255,255,255,0.15)]" 
-                                : "bg-app-text/30 hover:bg-app-text/50"
-                            )} 
-                          />
-                        ))}
-                      </div>
-                    )}
+                    <AnimatePresence mode="wait">
+                      {isRefreshing && !isOffline ? (
+                        <motion.div 
+                          key="refreshing-pill"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full mt-1.5 bg-app-surface border border-app-border backdrop-blur-md shadow-lg"
+                        >
+                          <Icons.RotateCcw className="w-3 h-3 text-app-text animate-spin" strokeWidth={2.5} />
+                          <span className="text-[10px] font-semibold text-app-text uppercase tracking-wider">
+                            <Translate text="Refreshing..." lang={state.settings.language || 'en'} />
+                          </span>
+                        </motion.div>
+                      ) : (
+                        state.locations.length > 1 && (
+                          <motion.div 
+                            key="city-dots"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            id="city-dots" 
+                            className="flex gap-1.5 mt-2"
+                          >
+                            {state.locations.map((_, i) => (
+                              <button 
+                                key={i} 
+                                onClick={() => {
+                                  if (state.activeLocationIndex !== i) {
+                                    Haptic.light(state.settings.hapticEnabled);
+                                    const dir = i > state.activeLocationIndex ? 'left' : 'right';
+                                    setSlideDirection(dir);
+                                    switchToCity(i);
+                                  }
+                                }}
+                                className={cn(
+                                  "w-1.5 h-1.5 rounded-full transition-all duration-300 pointer-events-auto outline-none focus:outline-none [-webkit-tap-highlight-color:transparent]",
+                                  state.activeLocationIndex === i 
+                                    ? "bg-app-text w-5 shadow-[0_0_8px_rgba(255,255,255,0.15)]" 
+                                    : "bg-app-text/30 hover:bg-app-text/50"
+                                )} 
+                              />
+                            ))}
+                          </motion.div>
+                        )
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -3426,8 +3308,9 @@ export default function App() {
                 Haptic.success(state.settings.hapticEnabled);
                 disableAllAnimations();
                 addLocation(loc);
-                handleBack();
                 if (showCityManager) {
+                  handleBackMultiple(2);
+                } else {
                   handleBack();
                 }
               }} 

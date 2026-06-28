@@ -6,14 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-/screenshots/
-/app-final.apk
-/*.apk
-/*.idsig
-
-# Capacitor Android project (not used - app uses GoNative/Median APK)
-/android/
-/capacitor.config.ts
-/app-release.6.apk
-
-

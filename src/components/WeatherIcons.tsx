@@ -288,11 +288,17 @@ function getSvgFilename(name: string): string {
 
 export const WeatherIcon = ({ name, style: propStyle = 'outline', className, strokeWidth = 1.4, forceColoured = false, isSettingsPreview = false, bypassDelay = false }: WeatherIconProps) => {
   const [isStaticDelay, setIsStaticDelay] = useState(() => {
+    if (bypassDelay) return false;
     const lastSwitch = (window as any).lastCitySwitchTime || 0;
+    if (lastSwitch === 0) {
+      (window as any).lastCitySwitchTime = Date.now();
+      return true;
+    }
     return (Date.now() - lastSwitch) < 2000;
   });
 
   useEffect(() => {
+    if (bypassDelay) return;
     const checkDelay = () => {
       const lastSwitch = (window as any).lastCitySwitchTime || 0;
       const elapsed = Date.now() - lastSwitch;
@@ -317,22 +323,19 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
     return () => {
       window.removeEventListener('city-switch', handleCitySwitch);
     };
-  }, []);
+  }, [bypassDelay]);
 
   const Icon = RawIcons[name] || Cloud;
   let style: any = forceColoured ? 'coloured' : propStyle;
 
-  if (isStaticDelay && !bypassDelay) {
-    if (style === 'animated_outline' || style === 'coloured') {
-      style = 'outline';
-    } else if (style === 'animated') {
-      style = 'static';
-    }
-  } else {
-    // We are replacing 'coloured' icon style in the app with the new beautiful animated outline style!
-    if (style === 'coloured') {
-      style = 'animated_outline';
-    }
+  // We are replacing 'coloured' icon style in the app with the new beautiful animated outline style!
+  if (style === 'coloured') {
+    style = 'animated_outline';
+  }
+
+  // During static delay, if style is 'animated', temporarily use 'static' to keep identical SVG but turn off CSS animations
+  if (isStaticDelay && style === 'animated') {
+    style = 'static';
   }
 
   // Handle new animated outline SVGs with high-performance embedding + cache
@@ -342,7 +345,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ rotate: 360 }}
+          animate={isStaticDelay ? false : { rotate: 360 }}
           transition={{ repeat: Infinity, duration: 25, ease: "linear" }}
         >
           <Sun className="w-full h-full text-amber-500" strokeWidth={strokeWidth} />
@@ -353,7 +356,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ rotate: [0, 8, -8, 0] }}
+          animate={isStaticDelay ? false : { rotate: [0, 8, -8, 0] }}
           transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
         >
           {name === 'Moon' ? (
@@ -368,7 +371,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ y: [0, -3, 0] }}
+          animate={isStaticDelay ? false : { y: [0, -3, 0] }}
           transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
         >
           <Cloud className="w-full h-full text-neutral-500" strokeWidth={strokeWidth} />
@@ -381,14 +384,14 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
           <motion.div
             className="absolute top-0 right-0 w-[55%] h-[55%] opacity-90 animate-none"
             style={{ transformOrigin: 'center' }}
-            animate={{ rotate: 360 }}
+            animate={isStaticDelay ? false : { rotate: 360 }}
             transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
           >
             <Sun className="w-full h-full text-amber-500" strokeWidth={strokeWidth} />
           </motion.div>
           <motion.div
             className="absolute bottom-0 left-0 w-[78%] h-[78%]"
-            animate={{ y: [0, -2, 0] }}
+            animate={isStaticDelay ? false : { y: [0, -2, 0] }}
             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
           >
             <Cloud className="w-full h-full text-neutral-500 fill-app-bg" strokeWidth={strokeWidth} />
@@ -402,14 +405,14 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
           <motion.div
             className="absolute top-0 right-0 w-[55%] h-[55%] opacity-90"
             style={{ transformOrigin: 'center' }}
-            animate={{ rotate: [0, 10, -10, 0] }}
+            animate={isStaticDelay ? false : { rotate: [0, 10, -10, 0] }}
             transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
           >
             <Moon className="w-full h-full text-sky-400" strokeWidth={strokeWidth} />
           </motion.div>
           <motion.div
             className="absolute bottom-0 left-0 w-[78%] h-[78%]"
-            animate={{ y: [0, -2, 0] }}
+            animate={isStaticDelay ? false : { y: [0, -2, 0] }}
             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
           >
             <Cloud className="w-full h-full text-neutral-500 fill-app-bg" strokeWidth={strokeWidth} />
@@ -421,7 +424,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ y: [0, -1.5, 0] }}
+          animate={isStaticDelay ? false : { y: [0, -1.5, 0] }}
           transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
         >
           <CloudFog className="w-full h-full text-neutral-500" strokeWidth={strokeWidth} />
@@ -432,7 +435,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ y: [0, -1.5, 0] }}
+          animate={isStaticDelay ? false : { y: [0, -1.5, 0] }}
           transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
         >
           {name === 'Droplets' ? (
@@ -447,7 +450,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ y: [0, -2, 0] }}
+          animate={isStaticDelay ? false : { y: [0, -2, 0] }}
           transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
         >
           {name === 'CloudSunRain' ? (
@@ -466,7 +469,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ 
+          animate={isStaticDelay ? false : { 
             y: [0, -1.5, 0],
             opacity: [1, 0.6, 1, 1, 0.5, 1, 1] 
           }}
@@ -487,7 +490,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ 
+          animate={isStaticDelay ? false : { 
             y: [0, -2, 0],
             rotate: [0, 4, -4, 0]
           }}
@@ -505,7 +508,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ x: [-2, 2, -2] }}
+          animate={isStaticDelay ? false : { x: [-2, 2, -2] }}
           transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
         >
           <Wind className="w-full h-full text-teal-400" strokeWidth={strokeWidth} />
@@ -516,7 +519,7 @@ export const WeatherIcon = ({ name, style: propStyle = 'outline', className, str
       return (
         <motion.div
           className={cn("select-none", className)}
-          animate={{ y: [1, -2, 1] }}
+          animate={isStaticDelay ? false : { y: [1, -2, 1] }}
           transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
         >
           {name === 'Sunrise' ? (
