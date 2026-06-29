@@ -1,5 +1,3 @@
-
-
 <p align="center">
   <img src="assest/icons/overcast.png" width="40%">
 </p>
@@ -106,7 +104,7 @@ Just open index.html in any browser.
 ## 📂Project Structure
 
 ```
-overcast/
+vayu-weather/
 │
 └── index.html       # Entire app — HTML + CSS + JS in one file
 └── README.md
@@ -126,6 +124,5 @@ overcast/
 ## ⚖️ License
 
 This project is licensed under the MIT License.
-
 
 

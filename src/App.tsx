@@ -18,6 +18,7 @@ import SettingsScreen, { TERMS_CONTENT, PRIVACY_CONTENT } from './components/Set
 import CityManager from './components/CityManager';
 import WeatherRadarMap from './components/WeatherRadarMap';
 import AlertsDisplay from './components/AlertsDisplay';
+import DailyForecastDetail from './components/DailyForecastDetail';
 import AtmosphereCanvas from './components/AtmosphereCanvas';
 import { Haptic } from './lib/haptics';
 import { format } from 'date-fns';
@@ -452,6 +453,15 @@ export default function App() {
     stateRef.current = state;
   }, [state]);
 
+  const [isAppLoaded, setIsAppLoaded] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsAppLoaded(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const refreshAQIForIndex = async (index: number) => {
     const locations = stateRef.current.locations;
     const city = locations[index];
@@ -595,6 +605,7 @@ export default function App() {
 
   // ALSO REFRESH AQI ON CITY SWITCH (if older than 30 min OR never fetched)
   useEffect(() => {
+    if (!isAppLoaded) return;
     const index = state.activeLocationIndex;
     const city = state.locations[index];
     if (!city) return;
@@ -618,10 +629,11 @@ export default function App() {
       console.log(`AQI stale or missing for switched city: ${city.name} — fetching now`);
       refreshAQIForIndex(index);
     }
-  }, [state.activeLocationIndex, state.locations, state.weatherData]);
+  }, [state.activeLocationIndex, state.locations, state.weatherData, isAppLoaded]);
 
   // Silent background weather update on city change if cache is older than 10 mins
   useEffect(() => {
+    if (!isAppLoaded) return;
     const index = state.activeLocationIndex;
     const city = state.locations[index];
     if (!city) return;
@@ -657,7 +669,7 @@ export default function App() {
     };
 
     runSilentWeatherActiveSync();
-  }, [state.activeLocationIndex]);
+  }, [state.activeLocationIndex, isAppLoaded]);
 
   // Step 5: Switch-to-city pausing handler to ensure no CPU waste and silky-smooth transitions
   useEffect(() => {
@@ -1292,6 +1304,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isAppLoaded) return;
+
     const initialRefresh = async () => {
       const locations = stateRef.current.locations;
       const initialIndex = stateRef.current.activeLocationIndex;
@@ -1342,7 +1356,7 @@ export default function App() {
     }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isAppLoaded]);
 
   // Midnight auto-update mechanism
   useEffect(() => {
@@ -1451,6 +1465,8 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showCityManager, setShowCityManager] = useState(false);
   const [showRadarMap, setShowRadarMap] = useState(false);
+  const [showDailyForecastDetail, setShowDailyForecastDetail] = useState(false);
+  const [selectedDailyForecastIndex, setSelectedDailyForecastIndex] = useState(0);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
   const [bgGradients, setBgGradients] = useState({
@@ -2661,7 +2677,7 @@ export default function App() {
     const cleanup = initGestures();
 
     const onSwipeLeft = () => {
-      if (state.showSettings || showSearch || showCityManager || showRadarMap || state.locations.length <= 1) {
+      if (state.showSettings || showSearch || showCityManager || showRadarMap || showDailyForecastDetail || state.locations.length <= 1) {
         setIsSwiping(false);
         setIsSwipeCommitted(false);
         return;
@@ -2671,7 +2687,7 @@ export default function App() {
     };
 
     const onSwipeRight = () => {
-      if (state.showSettings || showSearch || showCityManager || showRadarMap || state.locations.length <= 1) {
+      if (state.showSettings || showSearch || showCityManager || showRadarMap || showDailyForecastDetail || state.locations.length <= 1) {
         setIsSwiping(false);
         setIsSwipeCommitted(false);
         return;
@@ -2681,7 +2697,7 @@ export default function App() {
     };
 
     const onSwipeStart = () => {
-      if (state.showSettings || showSearch || showCityManager || showRadarMap || state.locations.length <= 1) return;
+      if (state.showSettings || showSearch || showCityManager || showRadarMap || showDailyForecastDetail || state.locations.length <= 1) return;
       setIsSwiping(true);
       setIsSwipeCommitted(false);
 
@@ -2767,7 +2783,7 @@ export default function App() {
     };
   }, [state.locations.length, state.activeLocationIndex]);
 
-  const isAnyModalOpen = state.showSettings || showCityManager || showRadarMap || showSearch;
+  const isAnyModalOpen = state.showSettings || showCityManager || showRadarMap || showSearch || showDailyForecastDetail;
 
   const weatherContent = React.useMemo(() => {
     if (!activeWeather || !activeLocation) return null;
@@ -2859,6 +2875,11 @@ export default function App() {
                           <DailyForecast 
                             weather={activeWeather} 
                             settings={state.settings} 
+                            onOpenDetailed={(idx) => {
+                              setSelectedDailyForecastIndex(idx);
+                              setShowDailyForecastDetail(true);
+                              pushPanel(() => setShowDailyForecastDetail(false), 'dailyforecastdetail');
+                            }}
                           />
                         )}
                       </div>
@@ -2929,25 +2950,21 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const savedScrollPositionRef = useRef(0);
+
   useEffect(() => {
-    if (isAnyModalOpen) {
+    // Exclude showDailyForecastDetail to preserve exact native background scroll position
+    const shouldLockScroll = state.showSettings || showCityManager || showRadarMap || showSearch;
+    if (shouldLockScroll) {
+      savedScrollPositionRef.current = window.scrollY;
       document.body.style.overflow = 'hidden';
-      document.body.style.height = '100dvh';
-      document.documentElement.style.overflow = 'hidden';
-      document.documentElement.style.height = '100dvh';
     } else {
       document.body.style.overflow = '';
-      document.body.style.height = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.height = '';
     }
     return () => {
       document.body.style.overflow = '';
-      document.body.style.height = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.height = '';
     };
-  }, [isAnyModalOpen]);
+  }, [state.showSettings, showCityManager, showRadarMap, showSearch]);
 
   const currentCode = activeWeather?.current?.weatherCode || 0;
   const currentSunrise = activeWeather?.daily?.sunrise?.[0];
@@ -3348,13 +3365,40 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showDailyForecastDetail && activeWeather && activeLocation && (
+          <motion.div
+            key="daily-forecast-detail-root"
+            initial={{ opacity: 0, x: "100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: "100%" }}
+            transition={{ 
+              duration: 0.35, 
+              ease: [0.25, 0.46, 0.45, 0.94]
+            }}
+            className="fixed inset-0 z-[110] bg-app-bg flex flex-col transform-gpu"
+            data-no-swipe
+          >
+            <DailyForecastDetail 
+              weather={activeWeather}
+              settings={state.settings}
+              activeLocation={activeLocation}
+              initialIndex={selectedDailyForecastIndex}
+              onClose={() => {
+                handleBack();
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main 
         className={cn(
           "max-w-[390px] mx-auto px-4 sm:px-[21px] pb-32 min-h-screen relative touch-pan-y bottom-content transition-[opacity,transform,padding-top] duration-250 ease-out",
           state.settings.layoutWeatherDetail === 'compact'
             ? "pt-[calc(env(safe-area-inset-top,24px)+24px)]"
             : "pt-[calc(env(safe-area-inset-top,24px)+116px)]",
-          isAnyModalOpen ? "opacity-0 pointer-events-none scale-[0.96]" : "opacity-100 scale-100"
+          isAnyModalOpen ? "pointer-events-none" : ""
         )}
       >
         {/* City Switching Skeleton overlay */}

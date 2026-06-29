@@ -119,7 +119,6 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
   const lastScrollPos = React.useRef(0);
   const lastActiveIndex = React.useRef(-1);
   const scrollTimeoutRef = React.useRef<any>(null);
-  const [showDetailInfo, setShowDetailInfo] = React.useState(false);
 
   const isDetailed = settings.layoutHourlyForecast !== 'compact';
 
@@ -261,41 +260,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
                 {t('hourly_forecast', settings.language)}
               </span>
             </div>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDetailInfo(!showDetailInfo);
-              }}
-              className="p-1 -m-1 hover:bg-white/5 rounded-full transition relative z-50"
-              aria-label="More hourly info"
-            >
-              <Icons.ChevronRight className="w-4 h-4 text-app-text-dim/50" />
-            </button>
           </div>
-
-          {showDetailInfo && (
-            <>
-              <div 
-                className="fixed inset-0 z-35 bg-transparent" 
-                onClick={() => setShowDetailInfo(false)} 
-              />
-              <div 
-                style={{ backgroundColor: 'var(--popup-bg)' }}
-                className="absolute top-[48px] left-[12px] right-[12px] z-40 border border-app-border rounded-[28px] rounded-tr-[10px] p-4 shadow-2xl backdrop-blur-xl animate-fade-in transition-all duration-300"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div 
-                  style={{ backgroundColor: 'var(--popup-bg)' }}
-                  className="absolute -top-[6px] right-[6px] w-3 h-3 border-l border-t border-app-border rotate-45 rounded-tl-[4px]" 
-                />
-                <div className="flex flex-col gap-2.5">
-                  <p className="text-[13px] leading-relaxed text-app-text font-normal font-sans text-left">
-                    <Translate text="Detailed view is coming soon." lang={settings.language || 'en'} />
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
 
           {/* Horizontally Scrollable content with bleed and scroll suppression */}
           <div 
@@ -569,12 +534,12 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
       </div>
     </div>
   );
+}interface DailyForecastProps extends ForecastProps {
+  onOpenDetailed?: (initialIndex: number) => void;
 }
 
-export function DailyForecast({ weather, settings }: ForecastProps) {
+export function DailyForecast({ weather, settings, onOpenDetailed }: DailyForecastProps) {
   if (!weather || !weather.daily) return null;
-
-  const [showDetailInfo, setShowDetailInfo] = React.useState(false);
 
   const minTemps = (weather?.daily?.temperatureMin || []).slice(0, 7);
   const maxTemps = (weather?.daily?.temperatureMax || []).slice(0, 7);
@@ -595,38 +560,14 @@ export function DailyForecast({ weather, settings }: ForecastProps) {
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              setShowDetailInfo(!showDetailInfo);
+              onOpenDetailed?.(0);
             }}
-            className="p-1 -m-1 hover:bg-white/5 rounded-full transition relative z-50 animate-fade-in"
+            className="p-1 -m-1 hover:bg-white/5 rounded-full transition relative z-50 animate-fade-in cursor-pointer"
             aria-label="More daily info"
           >
             <Icons.ChevronRight className="w-4 h-4 text-app-text-dim/50" />
           </button>
         </div>
-
-        {showDetailInfo && (
-          <>
-            <div 
-              className="fixed inset-0 z-35 bg-transparent" 
-              onClick={() => setShowDetailInfo(false)} 
-            />
-            <div 
-              style={{ backgroundColor: 'var(--popup-bg)' }}
-              className="absolute top-[48px] left-[12px] right-[12px] z-40 border border-app-border rounded-[28px] rounded-tr-[10px] p-4 shadow-2xl backdrop-blur-xl animate-fade-in transition-all duration-300"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div 
-                style={{ backgroundColor: 'var(--popup-bg)' }}
-                className="absolute -top-[6px] right-[6px] w-3 h-3 border-l border-t border-app-border rotate-45 rounded-tl-[4px]" 
-              />
-              <div className="flex flex-col gap-2.5">
-                <p className="text-[13px] leading-relaxed text-app-text font-normal font-sans text-left">
-                  <Translate text="Detailed view is coming soon." lang={settings.language || 'en'} />
-                </p>
-              </div>
-            </div>
-          </>
-        )}
 
         <div className="flex flex-col gap-1 w-full mt-1">
           {(weather?.daily?.time || []).slice(0, 7).map((time, i) => {
