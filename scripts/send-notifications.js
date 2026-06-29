@@ -4,7 +4,7 @@ const NOTIF_TYPE = process.argv[2]; // "morning" | "night" | "severe"
 
 const headers = {
   "Content-Type": "application/json",
-  "Authorization": `Key ${REST_KEY}`,
+  "Authorization": `Basic ${REST_KEY}`,
 };
 
 // Fetch all subscribed devices with tags
@@ -17,46 +17,24 @@ async function getDevices() {
   return (data.players || []).filter(p => p.tags?.city);
 }
 
-// Get user location from Firestore
-async function getUserFromFirestore(playerId) {
-  const url =
-    `https://firestore.googleapis.com/v1/projects/` +
-    `${FIREBASE_PROJECT_ID}/databases/${FIREBASE_DB_ID}` +
-    `/documents/users/${playerId}` +
-    `?key=${FIREBASE_API_KEY}`;
-
-  try {
-    const res = await fetch(url);
-    
-    if (!res.ok) {
-      console.log("No Firestore doc for:", playerId.slice(0,8));
-      return null;
+// Group devices by city
+function groupByCity(devices) {
+  const groups = {};
+  devices.forEach(d => {
+    const city = d.tags.city;
+    if (!groups[city]) {
+      groups[city] = {
+        lat: parseFloat(d.tags.lat),
+        lon: parseFloat(d.tags.lon),
+        playerIds: []
+      };
     }
-
-    const data = await res.json();
-    if (!data.fields) return null;
-
-    const f = data.fields;
-    const lat = parseFloat(f.latitude?.doubleValue  || 0);
-    const lon = parseFloat(f.longitude?.doubleValue || 0);
-
-    if (!lat || !lon) return null;
-
-    return {
-      cityName: f.cityName?.stringValue  || "your area",
-      lat,
-      lon,
-      alertMorning: f.alertMorningSummaryEnabled?.booleanValue ?? true,
-      alertNight:   f.alertNightSummaryEnabled?.booleanValue   ?? true,
-      alertSevere:  f.alertSevereEnabled?.booleanValue         ?? true,
-    };
-  } catch (e) {
-    console.warn("Firestore error:", e.message);
-    return null;
-  }
+    groups[city].playerIds.push(d.id);
+  });
+  return groups;
 }
 
-// Fetch weather
+// Fetch weather for a city
 async function getWeather(lat, lon) {
   const url = `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}&longitude=${lon}` +
@@ -77,105 +55,77 @@ function getCondition(code) {
   return "Cloudy";
 }
 
-// Send to one player — using player_id only
-async function sendToPlayer(playerId, title, body) {
-  const res = await fetch(
-    "https://api.onesignal.com/notifications",
-    {
-      method: "POST",
-      headers: osHeaders,
-      body: JSON.stringify({
-        app_id:             APP_ID,
-        include_player_ids: [playerId],
-        headings:           { en: title },
-        contents:           { en: body },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Send failed:", res.status, err);
-    return;
-  }
-
-  const result = await res.json();
-  console.log("Sent:", title, "→ recipients:", result.recipients);
+// Send notification to specific devices
+async function sendNotification(playerIds, title, body) {
+  await fetch("https://onesignal.com/api/v1/notifications", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      app_id: APP_ID,
+      include_player_ids: playerIds,
+      headings: { en: title },
+      contents: { en: body },
+    }),
+  });
+  console.log("Sent:", title, "to", playerIds.length, "devices");
 }
 
 async function run() {
-  const subscribers = await getSubscribers();
+  const devices = await getDevices();
+  const cities = groupByCity(devices);
 
-  if (subscribers.length === 0) {
-    console.log("No subscribers. Exiting.");
-    return;
-  }
-
-  for (const sub of subscribers) {
-    const user = await getUserFromFirestore(sub.id);
-
-    if (!user) {
-      console.log("Skipping", sub.id.slice(0,8), "— no location in Firestore");
-      continue;
-    }
-
-    const { cityName, lat, lon } = user;
-    console.log("Processing:", cityName, lat, lon);
-
-    const weather      = await getWeather(lat, lon);
-    const temp         = Math.round(weather.current.temperature_2m);
-    const feels        = Math.round(weather.current.apparent_temperature);
-    const code         = weather.current.weather_code;
-    const high         = Math.round(weather.daily.temperature_2m_max[0]);
-    const low          = Math.round(weather.daily.temperature_2m_min[0]);
+  for (const [cityName, info] of Object.entries(cities)) {
+    const weather = await getWeather(info.lat, info.lon);
+    const temp = Math.round(weather.current.temperature_2m);
+    const feels = Math.round(weather.current.apparent_temperature);
+    const code = weather.current.weather_code;
+    const condition = getCondition(code);
+    const high = Math.round(weather.daily.temperature_2m_max[0]);
+    const low = Math.round(weather.daily.temperature_2m_min[0]);
     const tomorrowHigh = Math.round(weather.daily.temperature_2m_max[1]);
     const tomorrowCode = weather.daily.weather_code[1];
 
-    if (NOTIF_TYPE === "morning" && (user.alertMorning ?? true)) {
-      await sendToPlayer(
-        sub.id,
-        `${temp}° now · Good Morning ☀️`,
-        `in ${cityName}\nfeels ${feels}°\nH:${high}° L:${low}°`
+    if (NOTIF_TYPE === "morning") {
+      await sendNotification(
+        info.playerIds,
+        `${temp}° now in ${cityName}`,
+        `feels ${feels}° · ${condition} · H:${high}° L:${low}°`
       );
     }
 
-    if (NOTIF_TYPE === "night" && (user.alertNight ?? true)) {
-      await sendToPlayer(
-        sub.id,
-        `${tomorrowHigh}° high tomorrow 🌙`,
-        `in ${cityName}\n${getCondition(tomorrowCode)} overnight`
+    if (NOTIF_TYPE === "night") {
+      await sendNotification(
+        info.playerIds,
+        `${tomorrowHigh}° high tomorrow`,
+        `in ${cityName} · ${getCondition(tomorrowCode)} overnight`
       );
     }
 
-    if (NOTIF_TYPE === "severe" && (user.alertSevere ?? true)) {
+    if (NOTIF_TYPE === "severe") {
       if (feels >= 42) {
-        await sendToPlayer(
-          sub.id,
-          `🔥 Extreme Heat Alert`,
-          `in ${cityName}\nFeels ${feels}°. Stay hydrated.`
+        await sendNotification(
+          info.playerIds,
+          `🔥 Extreme heat in ${cityName}`,
+          `Feels like ${feels}°. Stay hydrated, avoid sun.`
         );
       } else if (temp <= 2) {
-        await sendToPlayer(
-          sub.id,
-          `🥶 Extreme Cold Alert`,
-          `in ${cityName}\n${temp}°. Bundle up.`
+        await sendNotification(
+          info.playerIds,
+          `🥶 Extreme cold in ${cityName}`,
+          `${temp}° right now. Bundle up.`
         );
       } else if (code >= 95) {
-        await sendToPlayer(
-          sub.id,
-          `⛈ Storm Alert`,
-          `in ${cityName}\nThunderstorm active. Stay indoors.`
+        await sendNotification(
+          info.playerIds,
+          `⛈ Severe storm in ${cityName}`,
+          `Thunderstorm active. Stay indoors.`
         );
-      } else {
-        console.log("No severe conditions for:", cityName);
       }
     }
-
-    await new Promise(r => setTimeout(r, 200));
   }
 }
 
 run().catch(err => {
-y  console.error("Crashed:", err);
+  console.error("Notification job failed:", err);
   process.exit(1);
 });
