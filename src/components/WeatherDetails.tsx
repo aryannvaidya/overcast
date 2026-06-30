@@ -6,7 +6,7 @@ import { cn, GLASS_STYLE_SUBTLE } from '../lib/utils';
 import { formatTemp, formatWind, formatVisibility, formatPrecipitation, convertVisibility, formatGlobalTime } from '../lib/units';
 import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
-import { getCurrentHourIndex } from '../services/weatherService';
+import { getCurrentHourIndex, parseTimeToAbsoluteDate } from '../services/weatherService';
 import { useTranslatedText, Translate } from '../lib/translations';
 
 const PARTICLE_DOTS = [
@@ -574,7 +574,12 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
       const tStr = weather.hourly.time[idx];
       let formatted = '';
       try {
-        formatted = formatGlobalTime(tStr, { hourOnly: true, timeFormat: settings.timeFormat || '12h' });
+        const absDate = parseTimeToAbsoluteDate(tStr, weather.timezone);
+        formatted = formatGlobalTime(absDate, { 
+          hourOnly: true, 
+          timeFormat: settings.timeFormat || '12h',
+          timeZone: weather.timezone === 'auto' ? undefined : weather.timezone
+        });
       } catch {
         formatted = `${new Date(tStr).getHours()}:00`;
       }
@@ -1251,12 +1256,8 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
         <div key={key} className="grid grid-cols-[repeat(auto-fit,minmax(8.125rem,1fr))] gap-[0.625rem] w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto">
           {/* C. Precipitation Card (5-Hour, Rounded Rectangle Bars) */}
           {tiles.precipitation !== false && (() => {
-              const hourlyPrecips = weather.hourly?.precipitation || [];
-              const todayPrecips = hourlyPrecips.slice(0, 24);
-              const avgPrecipVal = todayPrecips.length > 0 
-                ? todayPrecips.reduce((sum: number, val: number) => sum + val, 0) / todayPrecips.length
-                : 0;
-              const avgPrecipFormatted = formatPrecipitation(avgPrecipVal, settings.unitPrecipitation as any);
+              const totalPrecipVal = weather.daily?.precipitationSum?.[0] ?? 0;
+              const totalPrecipFormatted = formatPrecipitation(totalPrecipVal, settings.unitPrecipitation as any);
               const displayPrecipUnit = settings.unitPrecipitation || 'mm';
               return (
                 <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.125rem] px-[1rem] sm:p-[1.25rem] flex flex-col justify-between h-[13.625rem] select-none relative overflow-hidden group shadow-xl">
@@ -1274,7 +1275,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                   <div className="flex flex-col gap-0.5 z-10 mt-5">
                     <div className="flex items-baseline">
                       <span className="text-[42px] font-[200] text-app-text leading-none block">
-                        {avgPrecipFormatted}
+                        {totalPrecipFormatted}
                       </span>
                       <span className="text-xl font-[200] text-app-text-dim/75 ml-0.5">
                         <Translate text={displayPrecipUnit} lang={settings.language || 'en'} />
@@ -1331,7 +1332,13 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
                               !showLabel && "opacity-0 select-none pointer-events-none"
                             )}
                           >
-                            {showLabel ? (item?.formattedTime || '') : ''}
+                            {showLabel ? (
+                              idx === 0 ? (
+                                <Translate text="Now" lang={settings.language || 'en'} />
+                              ) : (
+                                item?.formattedTime || ''
+                              )
+                            ) : ''}
                           </span>
                         );
                       })}

@@ -619,3 +619,82 @@ export async function fetchUserSettingsFromFirebase(
     return null;
   }
 }
+
+export async function syncAllLocationsToFirebase(
+  playerId: string,
+  locations: Location[],
+  settings: Settings
+): Promise<boolean> {
+  if (!playerId || !locations || locations.length === 0) {
+    return false;
+  }
+
+  const projectId = firebaseConfig.projectId;
+  const apiKey = firebaseConfig.apiKey;
+  const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+  // Build array of location map values for Firestore REST API
+  const locationValues = locations.map(loc => ({
+    mapValue: {
+      fields: {
+        name: { stringValue: loc.name || 'Unknown' },
+        lat: { doubleValue: loc.latitude },
+        lon: { doubleValue: loc.longitude },
+        country: { stringValue: loc.country || '' },
+        isCurrent: { booleanValue: !!loc.isCurrentLocation },
+      }
+    }
+  }));
+
+  const fields = [
+    'playerId',
+    'timezone',
+    'locations',
+    'alertMorningSummaryEnabled',
+    'alertNightSummaryEnabled',
+    'alertSevereEnabled',
+    'alertRainEnabled',
+    'alertThunderstormEnabled',
+  ];
+
+  const updateMaskQuery = fields.map(f => `updateMask.fieldPaths=${f}`).join('&');
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${playerId}?${updateMaskQuery}&key=${apiKey}`;
+
+  const body = {
+    fields: {
+      playerId: { stringValue: playerId },
+      timezone: { stringValue: timezone },
+      locations: { arrayValue: { values: locationValues } },
+      alertMorningSummaryEnabled: { booleanValue: settings.alertMorningSummary ?? true },
+      alertNightSummaryEnabled: { booleanValue: settings.alertNightSummary ?? true },
+      alertSevereEnabled: { booleanValue: settings.alertSevere ?? true },
+      alertRainEnabled: { booleanValue: settings.alertRain ?? true },
+      alertThunderstormEnabled: { booleanValue: settings.stormThreshold ?? true },
+    }
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.warn('Firestore sync failed:', response.status, err);
+      return false;
+    }
+
+    console.log('Synced', locations.length, 'locations to Firebase for', playerId);
+    return true;
+  } catch (error) {
+    console.warn('Firestore sync error:', error);
+    return false;
+  }
+}
+

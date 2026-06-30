@@ -29,7 +29,9 @@ import {
   applyNotifToggleStates,
   SafeNotif,
   safeOneSignal,
-  tagDeviceLocation
+  tagDeviceLocation,
+  initializeOneSignal,
+  syncAllLocationsToFirebase
 } from './services/oneSignalService';
 
 const DEFAULT_LOCATION: Location | null = null;
@@ -310,6 +312,26 @@ const AnimatedWeatherLoader = () => {
       </AnimatePresence>
     </div>
   );
+};
+
+const slideHorizontalVariants = {
+  initial: { 
+    x: "40%"
+  },
+  animate: { 
+    x: 0,
+    transition: {
+      duration: 0.28,
+      ease: [0.32, 0.72, 0, 1]
+    }
+  },
+  exit: { 
+    x: "40%",
+    transition: {
+      duration: 0.24,
+      ease: [0.32, 0.72, 0, 1]
+    }
+  }
 };
 
 export default function App() {
@@ -1610,6 +1632,18 @@ export default function App() {
       // Render fresh data, hide skeleton, and enable animations smoothly
       hideCitySkeleton();
       enableAllAnimations();
+
+      // Trigger 1 — Sync after successful weather load
+      (async () => {
+        try {
+          const playerId = await initializeOneSignal();
+          if (playerId) {
+            syncAllLocationsToFirebase(playerId, stateRef.current.locations, stateRef.current.settings);
+          }
+        } catch (err) {
+          console.warn("Silent weather sync failed:", err);
+        }
+      })();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.warn(`Weather fetch failed for ${location?.name || 'Unknown'}:`, errorMsg);
@@ -1768,6 +1802,18 @@ export default function App() {
         }
         return prev;
       });
+
+      // Trigger 1 — Sync after successful weather silent load
+      (async () => {
+        try {
+          const playerId = await initializeOneSignal();
+          if (playerId) {
+            syncAllLocationsToFirebase(playerId, stateRef.current.locations, stateRef.current.settings);
+          }
+        } catch (err) {
+          console.warn("Silent weather sync failed in silentRefreshCity:", err);
+        }
+      })();
     } catch (e) {
       console.warn("Silent refresh failed:", e);
     }
@@ -1847,6 +1893,18 @@ export default function App() {
           riseTime,
           setTime
         );
+
+        // Trigger 1 — Sync after successful weather switch fresh load
+        (async () => {
+          try {
+            const playerId = await initializeOneSignal();
+            if (playerId) {
+              syncAllLocationsToFirebase(playerId, stateRef.current.locations, stateRef.current.settings);
+            }
+          } catch (err) {
+            console.warn("Silent weather sync failed in switchToCity:", err);
+          }
+        })();
       } catch (err) {
         console.warn("switchToCity fetch failed:", err);
         setState(prev => ({
@@ -2038,6 +2096,18 @@ export default function App() {
           error: null
         };
       });
+
+      // Trigger 1 — Sync after successful weather bulk load
+      (async () => {
+        try {
+          const playerId = await initializeOneSignal();
+          if (playerId) {
+            syncAllLocationsToFirebase(playerId, stateRef.current.locations, stateRef.current.settings);
+          }
+        } catch (err) {
+          console.warn("Silent bulk weather sync failed:", err);
+        }
+      })();
     } catch (err) {
       console.warn('Bulk weather load failed, falling back to staggered:', err);
       // If we are online but bulk fails, try staggered
@@ -2068,6 +2138,18 @@ export default function App() {
     localStorage.setItem('app_settings', JSON.stringify(state.settings));
     localStorage.setItem('app_locations', JSON.stringify(state.locations));
     localStorage.setItem('app_active_index', state.activeLocationIndex.toString());
+
+    // Trigger 2 — Sync whenever settings or locations are updated (add, remove, reorder)
+    (async () => {
+      try {
+        const playerId = await initializeOneSignal();
+        if (playerId) {
+          syncAllLocationsToFirebase(playerId, state.locations, state.settings);
+        }
+      } catch (err) {
+        console.warn("Silent Firebase sync failed in useEffect:", err);
+      }
+    })();
   }, [state.settings, state.locations, state.activeLocationIndex]);
 
   const currentCityKey = state.locations[state.activeLocationIndex]?.id ?? state.activeLocationIndex;
@@ -2569,21 +2651,17 @@ export default function App() {
       if (closePanel) {
         closePanel();
       }
-      setTimeout(() => {
-        try {
-          window.history.back();
-        } catch (e) {
-          console.warn("history.back failed:", e);
-        }
-      }, 0);
+      try {
+        window.history.back();
+      } catch (e) {
+        console.warn("history.back failed:", e);
+      }
     } else {
-      setTimeout(() => {
-        try {
-          window.history.back();
-        } catch (e) {
-          console.warn("history.back failed:", e);
-        }
-      }, 0);
+      try {
+        window.history.back();
+      } catch (e) {
+        console.warn("history.back failed:", e);
+      }
     }
   };
 
@@ -2601,13 +2679,11 @@ export default function App() {
       }
     }
     if (actualPopped > 0) {
-      setTimeout(() => {
-        try {
-          window.history.go(-actualPopped);
-        } catch (e) {
-          console.warn("history.go failed:", e);
-        }
-      }, 0);
+      try {
+        window.history.go(-actualPopped);
+      } catch (e) {
+        console.warn("history.go failed:", e);
+      }
     }
   };
 
@@ -3233,13 +3309,10 @@ export default function App() {
           {state.showSettings && (
             <motion.div
             key="settings-screen-root"
-            initial={{ opacity: 0.9, x: "100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0.9, x: "100%" }}
-            transition={{ 
-              duration: 0.32, 
-              ease: [0.16, 1, 0.3, 1]
-            }}
+            variants={slideHorizontalVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[99999] bg-app-bg overflow-hidden transform-gpu"
           >
@@ -3261,12 +3334,12 @@ export default function App() {
         {showCityManager && (
           <motion.div 
             key="city-manager-root"
-            initial={{ opacity: 0.9, x: "100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0.9, x: "100%" }}
-            transition={{ 
-              duration: 0.32, 
-              ease: [0.16, 1, 0.3, 1]
+            initial={{ y: "100%", opacity: 1 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              y: { duration: 0.28, ease: [0.32, 0.72, 0, 1] },
+              opacity: { duration: 0 }
             }}
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[99990] bg-app-bg overflow-y-auto transform-gpu"
@@ -3308,13 +3381,14 @@ export default function App() {
         {showSearch && (
           <motion.div 
             key="search-bar-root"
-            initial={{ opacity: 0, x: "100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: "100%" }}
-            transition={{ 
-              duration: 0.35, 
-              ease: [0.25, 0.46, 0.45, 0.94]
+            initial={{ y: "100%", opacity: 1 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              y: { duration: 0.28, ease: [0.32, 0.72, 0, 1] },
+              opacity: { duration: 0 }
             }}
+            style={{ willChange: "transform" }}
             className="fixed inset-0 z-[99995] bg-app-bg flex flex-col pt-[calc(env(safe-area-inset-top,24px)+36px)] transform-gpu"
             data-no-swipe
           >
@@ -3343,14 +3417,12 @@ export default function App() {
         {showRadarMap && (
           <motion.div
             key="radar-map-root"
-            initial={{ opacity: 0, x: "-100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: "-100%" }}
-            transition={{ 
-              duration: 0.35, 
-              ease: [0.25, 0.46, 0.45, 0.94]
-            }}
-            className="fixed inset-0 z-[120] bg-app-bg settings-panel flex flex-col will-change-transform transform-gpu"
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+            style={{ willChange: "transform" }}
+            className="fixed inset-0 z-[120] bg-app-bg settings-panel flex flex-col transform-gpu"
             data-no-swipe
           >
             <WeatherRadarMap 
@@ -3369,13 +3441,11 @@ export default function App() {
         {showDailyForecastDetail && activeWeather && activeLocation && (
           <motion.div
             key="daily-forecast-detail-root"
-            initial={{ opacity: 0, x: "100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: "100%" }}
-            transition={{ 
-              duration: 0.35, 
-              ease: [0.25, 0.46, 0.45, 0.94]
-            }}
+            variants={slideHorizontalVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            style={{ willChange: "transform" }}
             className="fixed inset-0 z-[110] bg-app-bg flex flex-col transform-gpu"
             data-no-swipe
           >
