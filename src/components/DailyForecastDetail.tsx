@@ -48,15 +48,22 @@ export default function DailyForecastDetail({
 
   const dayHourlyTemps = weather.hourly?.temperature?.slice(startHour, endHour) || [];
   
-  // Calculate average humidity for selected day using current humidity and weather code
-  const currentHumidity = weather.current?.relativeHumidity ?? 55;
-  let avgHumidity = currentHumidity;
-  if (weatherCode >= 51 && weatherCode <= 86) {
-    avgHumidity = Math.min(95, currentHumidity + 15);
-  } else if (weatherCode >= 2 && weatherCode <= 48) {
-    avgHumidity = Math.min(85, Math.max(60, currentHumidity + 5));
+  // Calculate average humidity for the selected day from real hourly relative humidity
+  const dayHourlyHumidity = weather.hourly?.relativeHumidity?.slice(startHour, endHour) || [];
+  let avgHumidity = 55;
+  if (dayHourlyHumidity.length > 0) {
+    const sum = dayHourlyHumidity.reduce((a, b) => a + b, 0);
+    avgHumidity = Math.round(sum / dayHourlyHumidity.length);
   } else {
-    avgHumidity = Math.max(30, currentHumidity - 10);
+    // Fallback if hourly relative humidity isn't mapped
+    const currentHumidity = weather.current?.relativeHumidity ?? 55;
+    if (weatherCode >= 51 && weatherCode <= 86) {
+      avgHumidity = Math.min(95, currentHumidity + 15);
+    } else if (weatherCode >= 2 && weatherCode <= 48) {
+      avgHumidity = Math.min(85, Math.max(60, currentHumidity + 5));
+    } else {
+      avgHumidity = Math.max(30, currentHumidity - 10);
+    }
   }
 
   // Wind speed & wind direction (extract for afternoon/noon index 12 of that day)
@@ -191,7 +198,7 @@ export default function DailyForecastDetail({
   const sunY = mt * mt * p0.y + 2 * mt * sunT * p1.y + sunT * sunT * p2.y;
 
   return (
-    <div className="flex flex-col h-full w-full bg-app-bg text-app-text select-none overflow-y-auto no-scrollbar pb-10 transform-gpu">
+    <div className="flex flex-col h-full w-full bg-app-bg text-app-text select-none overflow-y-auto no-scrollbar pb-10 transform-gpu pt-[calc(env(safe-area-inset-top,24px)+24px)]">
       {/* Header Bar */}
       <header className="flex items-center justify-between px-6 py-5 shrink-0">
         <div className="flex flex-col text-left">
@@ -373,7 +380,7 @@ export default function DailyForecastDetail({
       {/* 4. Grid of 4 cards (Precipitation, Wind, Humidity, UV (Highest)) */}
       <section className="px-6 grid grid-cols-2 gap-3 max-w-[390px] mx-auto w-full shrink-0">
         {/* Precipitation Card */}
-        <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
+        <div className="bg-app-surface border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
           <div className="flex items-center gap-1.5">
             <Umbrella className="w-4 h-4 text-app-text-dim" strokeWidth={1.6} />
             <span className="text-[13px] font-medium text-app-text-dim">Precipitation</span>
@@ -388,7 +395,7 @@ export default function DailyForecastDetail({
         </div>
 
         {/* Wind Card */}
-        <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
+        <div className="bg-app-surface border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
           <div className="flex items-center gap-1.5">
             <Wind className="w-4 h-4 text-app-text-dim" strokeWidth={1.6} />
             <span className="text-[13px] font-medium text-app-text-dim">Wind</span>
@@ -401,7 +408,7 @@ export default function DailyForecastDetail({
         </div>
 
         {/* Humidity Card */}
-        <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
+        <div className="bg-app-surface border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
           <div className="flex items-center gap-1.5">
             <Droplet className="w-4 h-4 text-app-text-dim" strokeWidth={1.6} />
             <span className="text-[13px] font-medium text-app-text-dim">Humidity</span>
@@ -414,7 +421,7 @@ export default function DailyForecastDetail({
         </div>
 
         {/* UV (Highest) Card */}
-        <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
+        <div className="bg-app-surface border border-app-border rounded-[24px] p-[1.125rem] flex flex-col justify-between h-[115px] select-none shadow-md">
           <div className="flex items-center gap-1.5">
             <Sun className="w-4 h-4 text-app-text-dim" strokeWidth={1.6} />
             <span className="text-[13px] font-medium text-app-text-dim">UV (Highest)</span>
@@ -429,7 +436,7 @@ export default function DailyForecastDetail({
 
       {/* 5. Sunrise & Sunset full-width card with arc */}
       <section className="px-6 mt-4 max-w-[390px] mx-auto w-full shrink-0">
-        <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[24px] p-4 flex flex-col items-center justify-center select-none shadow-lg relative overflow-hidden">
+        <div className="bg-app-surface border border-app-border rounded-[24px] p-4 flex flex-col items-center justify-center select-none shadow-lg relative overflow-hidden">
           {/* Time text columns above the arc (Sunrise Left, Sunset Right) */}
           <div className="flex items-center justify-between w-full mb-2.5 px-2">
             <div className="flex flex-col text-left">

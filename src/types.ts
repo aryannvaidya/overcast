@@ -43,6 +43,7 @@ export interface WeatherData {
     snowfall?: number[];
     precipitation?: number[];
     uvIndex?: number[];
+    relativeHumidity?: number[];
   };
   daily: {
     time: string[];

@@ -670,6 +670,7 @@ export async function fetchWeather(lat: number, lon: number, timezone: string, c
       windSpeed: res.hourly?.wind_speed_10m || [],
       precipitation: res.hourly?.precipitation || [],
       uvIndex: res.hourly?.uv_index || [],
+      relativeHumidity: res.hourly?.relative_humidity_2m || [],
     },
     daily: {
       time: res.daily?.time || [],
@@ -1962,6 +1963,7 @@ export function getFallbackWeatherData(lat: number, lon: number, timezone: strin
       windSpeed: hourlyWindSpeed,
       precipitation: hourlyPrecip,
       uvIndex: hourlyUV,
+      relativeHumidity: hourlyTime.map(() => targetHum),
     },
     daily: {
       time: dailyTimes,

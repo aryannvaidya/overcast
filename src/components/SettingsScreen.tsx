@@ -682,9 +682,7 @@ const SettingsScreen = ({
       clearTimeout(onUpdateDebouncedRef.current);
       onUpdateDebouncedRef.current = null;
     }
-    setTimeout(() => {
-      onUpdate(latestLocalSettingsRef.current);
-    }, 0);
+    onUpdate(latestLocalSettingsRef.current);
   };
 
   const submitRatingToBackend = async (ratingVal: number) => {
@@ -746,9 +744,7 @@ const SettingsScreen = ({
       if (onUpdateDebouncedRef.current) {
         clearTimeout(onUpdateDebouncedRef.current);
       }
-      setTimeout(() => {
-        onUpdate(latestLocalSettingsRef.current);
-      }, 0);
+      onUpdate(latestLocalSettingsRef.current);
     };
   }, []);
   const [showDataSources, setShowDataSources] = useState(false);
@@ -1350,10 +1346,10 @@ const SettingsScreen = ({
             ref={sourcesScrollRef}
             id="sources-page"
             data-no-swipe
-            initial={{ x: "100%" }}
-            animate={{ x: "0%" }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ x: "40%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "40%" }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain sources-page touch-pan-y transform-gpu pointer-events-auto"
           >
@@ -1424,10 +1420,10 @@ const SettingsScreen = ({
             ref={tilesScrollRef}
             id="tiles-page"
             data-no-swipe
-            initial={{ x: "100%" }}
-            animate={{ x: "0%" }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ x: "40%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "40%" }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[1015] bg-app-bg overflow-y-auto overscroll-contain tiles-page touch-pan-y transform-gpu pointer-events-auto"
           >
@@ -1625,10 +1621,10 @@ const SettingsScreen = ({
             ref={alertsScrollRef}
             id="alerts-page"
             data-no-swipe
-            initial={{ x: "100%" }}
-            animate={{ x: "0%" }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ x: "40%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "40%" }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain alerts-page touch-pan-y transform-gpu pointer-events-auto"
           >
@@ -1712,10 +1708,10 @@ const SettingsScreen = ({
             ref={unitsScrollRef}
             id="units-page"
             data-no-swipe
-            initial={{ x: "100%" }}
-            animate={{ x: "0%" }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ x: "40%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "40%" }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain units-page touch-pan-y transform-gpu pointer-events-auto"
           >
@@ -1797,10 +1793,10 @@ const SettingsScreen = ({
             ref={generalScrollRef}
             id="general-page"
             data-no-swipe
-            initial={{ x: "100%" }}
-            animate={{ x: "0%" }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ x: "40%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "40%" }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[1010] bg-app-bg overflow-y-auto overscroll-contain general-page touch-pan-y transform-gpu pointer-events-auto"
           >
@@ -2086,10 +2082,10 @@ const SettingsScreen = ({
             ref={languageScrollRef}
             id="language-page"
             data-no-swipe
-            initial={{ x: "100%" }}
-            animate={{ x: "0%" }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ x: "40%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "40%" }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             style={{ willChange: "transform" }}
             className="fixed inset-0 z-[1015] bg-app-bg overflow-y-auto overscroll-contain language-page touch-pan-y transform-gpu pointer-events-auto"
           >
@@ -2396,7 +2392,7 @@ const SettingsScreen = ({
 
         {/* GitHub Contribution/Star Centered Modal Card */}
         {githubToast && (
-          <div className="fixed inset-0 z-[2030] flex items-center justify-center p-6 bg-app-bg/85">
+          <div className="fixed inset-0 z-[2030] flex items-center justify-center p-6 bg-black/60 backdrop-blur-[6px]">
             <motion.div 
               initial={{ opacity: 0, scale: 0.92, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

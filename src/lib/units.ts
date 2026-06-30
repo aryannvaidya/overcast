@@ -38,12 +38,12 @@ export const formatVisibility = (meters: number, unit: 'km' | 'miles') => {
   }
 };
 
-export const convertPrecipitation = (mm: number, unit: 'mm' | 'in') => {
-  if (unit === 'in') return mm * 0.0393701;
+export const convertPrecipitation = (mm: number, unit: 'mm' | 'in' | 'inches') => {
+  if (unit === 'in' || unit === 'inches') return mm * 0.0393701;
   return mm;
 };
 
-export const formatPrecipitation = (mm: number, unit: 'mm' | 'in') => {
+export const formatPrecipitation = (mm: number, unit: 'mm' | 'in' | 'inches') => {
   const val = convertPrecipitation(mm, unit);
   if (val === 0) return '0';
   if (val < 0.1) return '<0.1';
