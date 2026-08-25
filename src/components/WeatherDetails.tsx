@@ -670,7 +670,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
         if (key === 'aqi') {
           if (!tiles.aqi) return null;
           return (
-        <div key={key} id="aqi-glass-card" className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group">
+        <div key={key} id="aqi-glass-card" className="cv-auto w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 select-none">
               <Leaf className="w-5 h-5 text-app-text/75" strokeWidth={1.4} />
@@ -831,7 +831,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
     if (key === 'uv') {
       if (!tiles.uv) return null;
       return (
-        <div key={key} className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group">
+        <div key={key} className="cv-auto w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 select-none font-sans">
               <Sun className="w-5 h-5 text-app-text/75" strokeWidth={1.4} />
@@ -976,7 +976,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
       }
 
       return (
-        <div key={key} className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group select-none animate-fade-in animate-duration-500">
+        <div key={key} className="cv-auto w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative group select-none animate-fade-in animate-duration-500">
           {/* Header Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 select-none">
@@ -1114,7 +1114,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
     if (key === 'humidityVisibility') {
       if (tiles.humidity === false && tiles.visibility === false) return null;
       return (
-        <div key={key} className="grid grid-cols-[repeat(auto-fit,minmax(8.125rem,1fr))] gap-[0.625rem] w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto">
+        <div key={key} className="grid grid-cols-[repeat(auto-fit,minmax(8.125rem,1fr))] gap-[0.625rem] cv-auto w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto">
           {/* A. Humidity Card */}
           {tiles.humidity !== false && (
             <div className="bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.125rem] px-[1rem] sm:p-[1.25rem] flex flex-col justify-between h-[13.625rem] select-none relative overflow-hidden group shadow-xl">
@@ -1253,7 +1253,7 @@ export default function WeatherDetails({ weather, settings, location, focusKey }
     if (key === 'precipitationWind') {
       if (tiles.precipitation === false && tiles.wind === false) return null;
       return (
-        <div key={key} className="grid grid-cols-[repeat(auto-fit,minmax(8.125rem,1fr))] gap-[0.625rem] w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto">
+        <div key={key} className="grid grid-cols-[repeat(auto-fit,minmax(8.125rem,1fr))] gap-[0.625rem] cv-auto w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto">
           {/* C. Precipitation Card (5-Hour, Rounded Rectangle Bars) */}
           {tiles.precipitation !== false && (() => {
               const totalPrecipVal = weather.daily?.precipitationSum?.[0] ?? 0;

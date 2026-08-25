@@ -15,16 +15,6 @@ interface RGB {
   b: number;
 }
 
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  size: number;
-  opacity: number;
-  extra?: number; // wobble phase or random variance
-}
-
 // Convert Hex colors to RGB structure
 const hexToRgb = (hex: string): RGB => {
   const res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -34,8 +24,6 @@ const hexToRgb = (hex: string): RGB => {
     b: parseInt(res[3], 16)
   } : { r: 0, g: 0, b: 0 };
 };
-
-
 
 // Map condition variables to specific 5-stop color palettes
 const getTargetGradientColors = (weatherCode: number, isNight: boolean, sunriseISO?: string, sunsetISO?: string): RGB[] => {
@@ -97,74 +85,49 @@ const getTargetGradientColors = (weatherCode: number, isNight: boolean, sunriseI
   return hexes.map(hexToRgb);
 };
 
-export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunriseISO, sunsetISO }: AtmosphereCanvasProps) {
+// Cap DPR at 2 — flagships report 3+, which multiplies fill cost ~2.25x for no visible gain
+const MAX_DPR = 2;
+
+function AtmosphereCanvas({ weatherCode, isNight, settings, sunriseISO, sunsetISO }: AtmosphereCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameId = useRef<number | null>(null);
 
   // Maintain actual color states for smooth transition lerping
   const currentColors = useRef<RGB[]>([]);
   const targetColors = useRef<RGB[]>([]);
 
-  // Sound particle/lightning tracking objects
-  const particles = useRef<Particle[]>([]);
-  const lastWeatherState = useRef<{ code: number; night: boolean } | null>(null);
-  const lightningFlash = useRef<number>(0); // opacity offset of lightning
-
-  useEffect(() => {
-    // Prime values
-    const tG = getTargetGradientColors(weatherCode, isNight, sunriseISO, sunsetISO);
-    targetColors.current = tG;
-    if (currentColors.current.length === 0) {
-      currentColors.current = tG.map(c => ({ ...c }));
-    }
-  }, [weatherCode, isNight, sunriseISO, sunsetISO]);
-
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || settings.backgroundGlow === 'off') return;
 
-    // Fast resize handling using high-DPI scaling
+    targetColors.current = getTargetGradientColors(weatherCode, isNight, sunriseISO, sunsetISO);
+    if (currentColors.current.length === 0) {
+      currentColors.current = targetColors.current.map(c => ({ ...c }));
+    }
+
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    if (!ctx) return;
+
     const handleResize = () => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
-      
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset
-        ctx.scale(dpr, dpr);
-      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset
+      ctx.scale(dpr, dpr);
+      scheduleRepaint();
     };
 
-    handleResize();
-    window.addEventListener('resize', handleResize);
+    // Paints exactly one frame (lerp step + gradient fill).
+    // Returns true only while colors are still converging, so the caller can
+    // stop the loop instead of repainting an identical gradient at 60fps forever.
+    const paintFrame = (): boolean => {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (w === 0 || h === 0) return false;
 
-    // Weather particles creator (disabled to ensure zero CPU overhead and lag-free transitions)
-    const initParticles = (code: number, night: boolean) => {
-      particles.current = [];
-    };
-
-    // Main animation ticking loop
-    const tick = () => {
-      const gC = canvas.getBoundingClientRect();
-      const w = gC.width;
-      const h = gC.height;
-
-      if (w === 0 || h === 0) {
-        animationFrameId.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        animationFrameId.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      // 1. Smoothly interpolate (lerp) color stopped values
+      // 1. Smoothly interpolate color stopped values
       let needLerp = false;
-      const step = 0.055; // buttery lerp rate, extremely responsive but smooth
+      const step = 0.055;
 
       for (let i = 0; i < targetColors.current.length; i++) {
         const cur = currentColors.current[i];
@@ -187,21 +150,10 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunri
         }
       }
 
-      // Check if code has changed to rebuild particle structures
-      const stateKey = lastWeatherState.current;
-      if (!stateKey || stateKey.code !== weatherCode || stateKey.night !== isNight) {
-        lastWeatherState.current = { code: weatherCode, night: isNight };
-        initParticles(weatherCode, isNight);
-      }
-
-      // Manage random lightning flash in severe thunderstorms - disabled to avoid screen blinking
-      lightningFlash.current = 0;
-
       // 2. Clear & paint the custom hardware accelerated gradient
       ctx.clearRect(0, 0, w, h);
 
-      // Create beautiful atmospheric radial gradient mimicking high end weather backdrops
-      // Centered at (50% of screen, 220px from top) with radius 550px
+      // Centered at (50% of width, 220px from top) with radius 550px
       const cx = w / 2;
       const cy = 220;
       const rad = 550;
@@ -209,37 +161,52 @@ export default function AtmosphereCanvas({ weatherCode, isNight, settings, sunri
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
       currentColors.current.forEach((color, idx) => {
         const stop = idx * 0.25; // 0, 0.25, 0.50, 0.75, 1.0
-        
         grad.addColorStop(stop, `rgb(${Math.round(color.r)},${Math.round(color.g)},${Math.round(color.b)})`);
       });
 
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
-      // 3. Update & render particles (Particle rendering disabled for maximum performance)
-
-      animationFrameId.current = requestAnimationFrame(tick);
+      return needLerp;
     };
 
-    animationFrameId.current = requestAnimationFrame(tick);
+    let frameId: number | null = null;
+
+    const tick = () => {
+      frameId = null;
+      if (paintFrame()) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    const scheduleRepaint = () => {
+      if (frameId === null) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    scheduleRepaint();
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (animationFrameId.current) {
-        cancelAnimationFrame(animationFrameId.current);
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+        frameId = null;
       }
     };
-  }, [weatherCode, isNight, settings]);
+  }, [weatherCode, isNight, settings, sunriseISO, sunsetISO]);
 
   return (
-    <canvas 
-      ref={canvasRef} 
+    <canvas
+      ref={canvasRef}
       className="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
-      style={{ 
+      style={{
         display: settings.backgroundGlow === 'off' ? 'none' : 'block',
-        willChange: 'transform',
         imageRendering: 'auto'
-      }} 
+      }}
     />
   );
 }
+
+export default React.memo(AtmosphereCanvas);

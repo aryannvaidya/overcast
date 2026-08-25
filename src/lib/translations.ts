@@ -4536,13 +4536,25 @@ const translationCache: Record<string, string> = (() => {
   }
 })();
 
-function saveTranslationToCache(key: string, val: string) {
-  if (typeof window === 'undefined') return;
+let pendingCacheWrite = false;
+function writeTranslationCache() {
+  pendingCacheWrite = false;
   try {
-    translationCache[key] = val;
     localStorage.setItem('nimbus_translations_cache_v1', JSON.stringify(translationCache));
   } catch (err) {
     console.warn("localStorage quota exceeded or failed to save translation:", err);
+  }
+}
+
+function saveTranslationToCache(key: string, val: string) {
+  if (typeof window === 'undefined') return;
+  translationCache[key] = val;
+  if (pendingCacheWrite) return;
+  pendingCacheWrite = true;
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(writeTranslationCache, { timeout: 2000 });
+  } else {
+    setTimeout(writeTranslationCache, 300);
   }
 }
 

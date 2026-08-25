@@ -22,7 +22,7 @@ import DailyForecastDetail from './components/DailyForecastDetail';
 import AtmosphereCanvas from './components/AtmosphereCanvas';
 import { Haptic } from './lib/haptics';
 import { format } from 'date-fns';
-import { Translate, fetchDynamicTranslation } from './lib/translations';
+import { Translate, fetchDynamicTranslation, useTranslatedText } from './lib/translations';
 import { 
   NotifSettings, 
   checkWeatherAlerts, 
@@ -168,36 +168,6 @@ const enableAnimations = () => {
 
 const disableAllAnimations = killAnimations;
 const enableAllAnimations = enableAnimations;
-
-// Step 4: Throttled rAF loop for lightweight animation coordination
-if (typeof window !== 'undefined') {
-  let lastFrame = 0;
-  const FPS_LIMIT = 30;
-  const FRAME_MIN_TIME = 1000 / FPS_LIMIT;
-
-  const updateParticles = () => {
-    // Coordinate/sync particles at 30fps
-  };
-
-  const updateWeatherFX = () => {
-    // Coordinate/sync weatherFX at 30fps
-  };
-
-  const animationLoop = (timestamp: number) => {
-    if (timestamp - lastFrame < FRAME_MIN_TIME) {
-      requestAnimationFrame(animationLoop);
-      return;
-    }
-    lastFrame = timestamp;
-
-    updateParticles();
-    updateWeatherFX();
-
-    requestAnimationFrame(animationLoop);
-  };
-
-  requestAnimationFrame(animationLoop);
-}
 
 // Step 6: Power savings / reduced motion animation check
 if (typeof window !== 'undefined') {
@@ -2297,6 +2267,7 @@ export default function App() {
 
   const activeWeather = state.weatherData[state.activeLocationIndex];
   const activeLocation = state.locations[state.activeLocationIndex];
+  const cityNameText = useTranslatedText(activeLocation?.name || 'Loading...', state.settings.language || 'en');
 
   // Sync background weather gradient on active location/weather data change
   useEffect(() => {
@@ -3065,8 +3036,8 @@ export default function App() {
       className="min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-text/20 transition-colors duration-500 relative"
     >
       {/* Background is clean light theme */}
-      <div 
-        id="ui-overlay" 
+      <div
+        id="ui-overlay"
         className={cn(
           "fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] z-[100] pointer-events-none pt-[env(safe-area-inset-top)] transition-all duration-350 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]",
           isAnyModalOpen ? "opacity-0 pointer-events-none scale-[0.96]" : "opacity-100"
@@ -3199,37 +3170,33 @@ export default function App() {
 
 
             {/* City Name & Pagination - Center */}
-            <div className="absolute top-[calc(env(safe-area-inset-top,24px)+36px)] flex flex-col items-center pointer-events-none mt-2" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+            <div className="absolute top-[calc(env(safe-area-inset-top,24px)+36px)] left-1/2 -translate-x-1/2 w-[calc(100%-160px)] max-w-[230px] flex flex-col items-center pointer-events-none mt-2">
               <AnimatePresence mode="wait">
                 {state.locations.length > 0 && (
                   <motion.div 
                     key={`city-header-${state.activeLocationIndex}`}
-                    initial={{ opacity: 0, scale: 0.96, y: 3 }}
+                    initial={{ opacity: 0, y: 3 }}
                     animate={{ 
                       opacity: (state.showSettings || showCityManager || showRadarMap) ? 0 : 1, 
-                      scale: (state.showSettings || showCityManager || showRadarMap) ? 0.96 : 1, 
                       y: (state.showSettings || showCityManager || showRadarMap) ? -3 : 0 
                     }}
-                    exit={{ opacity: 0, scale: 0.96, y: -3 }}
-                    transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    exit={{ opacity: 0, y: -3 }}
+                    transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    style={{ willChange: 'transform, opacity' }}
                     className="flex flex-col items-center justify-center"
                   >
-                    <div className="flex items-center justify-center relative pointer-events-auto select-none gap-1.5">
+                    <div className="flex items-center justify-center pointer-events-auto select-none gap-1.5 min-w-0 max-w-full">
                       <div className="flex items-center gap-1.5">
                         {activeLocation?.isCurrentLocation && (
                           <svg viewBox="0 0 24 24" className={cn("w-3.5 h-3.5 shrink-0", state.settings.colorTheme === 'pink' ? "text-white" : "text-app-text")} fill="currentColor">
                             <path fillRule="evenodd" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" clipRule="evenodd" />
                           </svg>
                         )}
-                        <span id="city-name" className={cn("text-[17px] font-semibold transition-colors duration-300", state.settings.colorTheme === 'pink' ? "text-white" : "text-app-text")}>
-                          {activeLocation?.name ? (
-                            <Translate text={activeLocation.name} lang={state.settings.language || 'en'} />
-                          ) : (
-                            <Translate text="Loading..." lang={state.settings.language || 'en'} />
-                          )}
+                        <span id="city-name" className={cn("text-[17px] font-semibold transition-colors duration-300 min-w-0 truncate", state.settings.colorTheme === 'pink' ? "text-white" : "text-app-text")}>
+                          {cityNameText}
                         </span>
                       </div>
-                      <div className="absolute left-full ml-1.5 flex items-center justify-center">
+                      <div className="flex items-center justify-center shrink-0">
                         <button 
                           onClick={() => {
                             Haptic.medium(state.settings.hapticEnabled);

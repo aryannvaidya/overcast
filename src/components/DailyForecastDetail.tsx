@@ -275,7 +275,7 @@ export default function DailyForecastDetail({
         <div className="relative flex items-center justify-start w-[84px] h-[84px] pl-3 animate-fade-in shrink-0">
           <WeatherIcon 
             name={info.icon as any} 
-            style={settings.iconStyle} 
+            style="static" 
             className="w-[80px] h-[80px]"
             strokeWidth={1.2}
           />

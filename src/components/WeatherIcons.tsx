@@ -49,10 +49,10 @@ import {
   ArrowLeft,
   Pencil
 } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
-import { STATIC_SVGS, ANIMATED_SVGS } from './WeatherSvgData';
+import { STATIC_SVGS } from './WeatherSvgData';
 
 export const RawIcons = {
   Sun,
@@ -125,6 +125,24 @@ const WEATHER_ICONS_SET = new Set([
 ]);
 
 const svgCache: Record<string, string> = {};
+
+let animatedSvgData: Record<string, string> | null = null;
+const animatedSvgListeners = new Set<() => void>();
+let animatedSvgRequested = false;
+function subscribeAnimatedSvgs(cb: () => void) {
+  animatedSvgListeners.add(cb);
+  if (!animatedSvgRequested) {
+    animatedSvgRequested = true;
+    import('./WeatherAnimatedSvgData')
+      .then((m) => {
+        animatedSvgData = m.ANIMATED_SVGS;
+        animatedSvgListeners.forEach((l) => l());
+      })
+      .catch(() => { animatedSvgRequested = false; });
+  }
+  return () => { animatedSvgListeners.delete(cb); };
+}
+function getAnimatedSnapshot() { return animatedSvgData; }
 
 export const EmbeddedSvg = ({ 
   src, 
@@ -296,6 +314,7 @@ export const WeatherIcon = React.memo(({ name, style: propStyle = 'outline', cla
     }
     return (Date.now() - lastSwitch) < 2000;
   });
+  const animatedSvgs = useSyncExternalStore(subscribeAnimatedSvgs, getAnimatedSnapshot, getAnimatedSnapshot);
 
   useEffect(() => {
     if (bypassDelay) return;
@@ -542,7 +561,7 @@ export const WeatherIcon = React.memo(({ name, style: propStyle = 'outline', cla
     const scale = isSettingsPreview 
       ? (isSunOrMoon ? 1.95 : 1.35) 
       : (isSunOrMoon ? 2.025 : 1.35);
-    const svgMap = style === 'static' ? STATIC_SVGS : ANIMATED_SVGS;
+    const svgMap = style === 'static' ? STATIC_SVGS : (animatedSvgs ?? STATIC_SVGS);
     const svgContent = svgMap[filename];
 
     if (svgContent) {

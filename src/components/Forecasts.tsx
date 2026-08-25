@@ -1,10 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { WeatherData, Settings } from '../types';
 import { WeatherIcon } from './WeatherIcons';
 import { getWeatherInfo, getHourlyIcon, shouldShowPrecip, getCurrentHourIndex, parseTimeToAbsoluteDate, getWeatherThemeColor, getCurrentWeatherState } from '../services/weatherService';
 import { t, translateWmoCode, Translate } from '../lib/translations';
 import { formatTemp } from '../lib/units';
-import { motion } from 'motion/react';
 import { format, parseISO } from 'date-fns';
 import { cn, GLASS_STYLE_SUBTLE } from '../lib/utils';
 
@@ -114,7 +113,7 @@ function formatHourlyTimeFromISO(timeVal: string | Date, timeZone: string, timeF
   }
 }
 
-export function HourlyForecast({ weather, settings }: ForecastProps) {
+function HourlyForecastBase({ weather, settings }: ForecastProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const lastScrollPos = React.useRef(0);
   const lastActiveIndex = React.useRef(-1);
@@ -122,155 +121,38 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
 
   const isDetailed = settings.layoutHourlyForecast !== 'compact';
 
-  // --- CUSTOM ULTRA-SENSITIVE horizontal drag-scrolling with buttery momentum ---
-  const isDragging = React.useRef(false);
-  const startX = React.useRef(0);
-  const startY = React.useRef(0);
-  const startScrollLeft = React.useRef(0);
-  const velocity = React.useRef(0);
-  const lastTouchTime = React.useRef(0);
-  const lastTouchX = React.useRef(0);
-  const rafInertia = React.useRef<number | null>(null);
-  const isScrollingVertically = React.useRef(false);
-  const hasDeterminedDirection = React.useRef(false);
+  // --- Desktop-only mouse drag scrolling ---
+  // Touch devices rely on native momentum scrolling (overflow-x auto), which is
+  // smoother than any JS simulation. Mouse users get click-drag panning instead.
+  const mouseDragPointerId = React.useRef<number | null>(null);
+  const mouseDragStartX = React.useRef(0);
+  const mouseDragStartScrollLeft = React.useRef(0);
 
-  // Stop momentum slide immediately
-  const stopMomentum = React.useCallback(() => {
-    if (rafInertia.current) {
-      cancelAnimationFrame(rafInertia.current);
-      rafInertia.current = null;
+  const handleMouseDragStart = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || !scrollRef.current) return;
+    mouseDragPointerId.current = e.pointerId;
+    mouseDragStartX.current = e.clientX;
+    mouseDragStartScrollLeft.current = scrollRef.current.scrollLeft;
+    try {
+      scrollRef.current.setPointerCapture(e.pointerId);
+      scrollRef.current.style.scrollBehavior = 'auto';
+    } catch {
+      // ignore pointer capture failures
     }
   }, []);
 
-  const startMomentum = React.useCallback((initialVelocity: number) => {
-    stopMomentum();
-
-    let vel = initialVelocity;
-    const friction = 0.95; // Decay factor for friction
-
-    const step = () => {
-      if (!scrollRef.current) return;
-      
-      scrollRef.current.scrollLeft -= vel;
-      vel *= friction;
-
-      if (Math.abs(vel) > 0.3) {
-        rafInertia.current = requestAnimationFrame(step);
-      } else {
-        rafInertia.current = null;
-      }
-    };
-
-    rafInertia.current = requestAnimationFrame(step);
-  }, [stopMomentum]);
-
-  const handleDragStart = React.useCallback((clientX: number, clientY: number) => {
-    stopMomentum();
-
-    isDragging.current = true;
-    isScrollingVertically.current = false;
-    hasDeterminedDirection.current = false;
-    startX.current = clientX;
-    startY.current = clientY;
-    startScrollLeft.current = scrollRef.current ? scrollRef.current.scrollLeft : 0;
-    
-    lastTouchTime.current = Date.now();
-    lastTouchX.current = clientX;
-    velocity.current = 0;
-
-    if (typeof window !== 'undefined') {
-      (window as any).isInteractingWithHourly = true;
-    }
-  }, [stopMomentum]);
-
-  const handleDragMove = React.useCallback((clientX: number, clientY: number, preventDefaultFn: () => void) => {
-    if (!isDragging.current || !scrollRef.current) return;
-
-    const currentX = clientX;
-    const currentY = clientY;
-    const currentTime = Date.now();
-    
-    const deltaX = currentX - startX.current;
-    const deltaY = currentY - startY.current;
-
-    // Filter vertical gestures from horizontal swipe
-    if (!hasDeterminedDirection.current) {
-      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 6) {
-        isScrollingVertically.current = true;
-        isDragging.current = false;
-        hasDeterminedDirection.current = true;
-        return;
-      } else if (Math.abs(deltaX) > 6) {
-        isScrollingVertically.current = false;
-        hasDeterminedDirection.current = true;
-      }
-    }
-
-    if (isScrollingVertically.current) return;
-
-    // Track frame velocity (pixels per millisecond)
-    const dt = currentTime - lastTouchTime.current;
-    if (dt > 0) {
-      const dx = currentX - lastTouchX.current;
-      velocity.current = (dx / dt) * 16; // approx pixels per frame at 60fps
-    }
-
-    lastTouchTime.current = currentTime;
-    lastTouchX.current = currentX;
-
-    // Sensitivity multiplier: increased by 200% means we scroll 3.0x further!
-    const sensitivityMultiplier = 3.0;
-    scrollRef.current.scrollLeft = startScrollLeft.current - deltaX * sensitivityMultiplier;
-
-    // Prevent scrolling parent card or page
-    preventDefaultFn();
+  const handleMouseDragMove = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (mouseDragPointerId.current !== e.pointerId || !scrollRef.current) return;
+    scrollRef.current.scrollLeft = mouseDragStartScrollLeft.current - (e.clientX - mouseDragStartX.current);
   }, []);
 
-  const handleDragEnd = React.useCallback(() => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    
-    if (typeof window !== 'undefined') {
-      setTimeout(() => {
-        (window as any).isInteractingWithHourly = false;
-      }, 200);
+  const handleMouseDragEnd = React.useCallback(() => {
+    if (mouseDragPointerId.current === null) return;
+    mouseDragPointerId.current = null;
+    if (scrollRef.current) {
+      scrollRef.current.style.scrollBehavior = '';
     }
-
-    // Butter momentum deceleration
-    if (Math.abs(velocity.current) > 0.5 && !isScrollingVertically.current) {
-      startMomentum(velocity.current * 2.5); // Highly responsive momentum glide
-    }
-  }, [startMomentum]);
-
-  // Touch triggers
-  const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
-    handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
-  }, [handleDragStart]);
-
-  const handleTouchMove = React.useCallback((e: React.TouchEvent) => {
-    handleDragMove(e.touches[0].clientX, e.touches[0].clientY, () => {
-      if (e.cancelable) e.preventDefault();
-    });
-  }, [handleDragMove]);
-
-  const handleTouchEnd = React.useCallback(() => {
-    handleDragEnd();
-  }, [handleDragEnd]);
-
-  // Mouse drag triggers
-  const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
-    handleDragStart(e.clientX, e.clientY);
-  }, [handleDragStart]);
-
-  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
-    if (e.buttons === 1) {
-      handleDragMove(e.clientX, e.clientY, () => e.preventDefault());
-    }
-  }, [handleDragMove]);
-
-  const handleMouseUp = React.useCallback(() => {
-    handleDragEnd();
-  }, [handleDragEnd]);
+  }, []);
 
   React.useEffect(() => {
     return () => {
@@ -281,9 +163,8 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
         (window as any).isScrollingHourly = false;
         (window as any).isInteractingWithHourly = false;
       }
-      stopMomentum();
     };
-  }, [stopMomentum]);
+  }, []);
 
   if (!weather || !weather.hourly || !weather.daily) return null;
 
@@ -401,7 +282,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
 
     return (
       <div className="flex flex-col px-0 -mx-[1rem] sm:-mx-[1.3125rem] hourly-forecast" data-no-swipe>
-        <div className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative">
+        <div className="cv-auto w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative">
           
           {/* Header row exactly matching other cards */}
           <div className="flex items-center justify-between select-none">
@@ -417,15 +298,11 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
           <div 
             ref={scrollRef}
             onScroll={handleScroll}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            className="flex gap-0 overflow-x-auto no-scrollbar pb-1 -mx-6 px-6 snap-x snap-mandatory scroll-smooth will-change-transform relative z-10"
+            onPointerDown={handleMouseDragStart}
+            onPointerMove={handleMouseDragMove}
+            onPointerUp={handleMouseDragEnd}
+            onPointerCancel={handleMouseDragEnd}
+            className="flex gap-0 overflow-x-auto no-scrollbar pb-1 -mx-6 px-6 relative z-10"
             data-no-swipe
           >
             {hourlyData.length > 0 ? (
@@ -514,7 +391,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
                         <div className="h-7 mb-3.5 flex items-center justify-center">
                           <WeatherIcon 
                             name={info.icon as any} 
-                            style={settings.iconStyle} 
+                            style="static" 
                             className="w-[25px] h-[25px]"
                             strokeWidth={1.8}
                           />
@@ -559,30 +436,24 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        className="flex gap-3 overflow-x-auto no-scrollbar pb-4 px-6 snap-x snap-mandatory scroll-smooth will-change-transform"
+        onPointerDown={handleMouseDragStart}
+        onPointerMove={handleMouseDragMove}
+        onPointerUp={handleMouseDragEnd}
+        onPointerCancel={handleMouseDragEnd}
+        className="flex gap-3 overflow-x-auto no-scrollbar pb-4 px-6"
         data-no-swipe
       >
         {hourlyData.length > 0 ? hourlyData.map((item, i) => {
           if (item.type === 'sunrise' || item.type === 'sunset') {
             const isSunrise = item.type === 'sunrise';
             return (
-              <motion.div
+              <div
                 key={`astro-${i}`}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.03, duration: 0.4 }}
                 className={cn(
-                  "flex flex-col items-center min-w-[64px] h-[130px] py-4 px-1 snap-center gpu",
+                  "animate-fade-in flex flex-col items-center min-w-[64px] h-[130px] py-4 px-1 gpu",
                   "rounded-[30px] border border-app-border bg-amber-500/5 backdrop-blur-3xl"
                 )}
+                style={{ animationDelay: `${i * 30}ms`, animationFillMode: "backwards" }}
               >
                 <span className="text-[10px] font-medium tracking-tight text-app-text-dim">
                   {formatLocalTime(item.time, weather.timezone, 'time', settings.timeFormat).replace(/\s*(?:AM|PM|am|pm)/gi, '').trim()}
@@ -591,7 +462,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
                 <div className="flex-1 flex items-center justify-center my-0.5">
                   <WeatherIcon 
                     name={isSunrise ? "Sunrise" : "Sunset"} 
-                    style={settings.iconStyle} 
+                    style="static" 
                     className="w-[28px] h-[28px]"
                     forceColoured={true}
                     strokeWidth={1.4}
@@ -601,7 +472,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
                  <span className="text-[9px] font-bold text-app-text uppercase tracking-wider">
                   {isSunrise ? t('sunrise', settings.language) : t('sunset', settings.language)}
                 </span>
-              </motion.div>
+              </div>
             );
           }
 
@@ -609,16 +480,14 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
           const info = getWeatherInfo(item.weatherCode, item.isDay);
           
           return (
-            <motion.div
+            <div
               key={`weather-${item.rawTimeStr || i}`}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.03, duration: 0.4 }}
               className={cn(
-                "flex flex-col items-center min-w-[64px] h-[130px] py-4 px-1 transition-all duration-300 snap-center gpu relative overflow-hidden",
+                "animate-fade-in flex flex-col items-center min-w-[64px] h-[130px] py-4 px-1 transition-all duration-300 gpu relative overflow-hidden",
                 "rounded-[30px] border border-app-border backdrop-blur-3xl",
                 isNow ? "bg-app-surface border-app-text/20 shadow-lg" : "bg-app-surface"
               )}
+              style={{ animationDelay: `${i * 30}ms`, animationFillMode: "backwards" }}
             >
               {isNow && (
                 <div className="absolute inset-0 bg-gradient-to-br from-app-text/[0.08] to-transparent pointer-events-none rounded-[30px]" />
@@ -633,7 +502,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
               <div className="flex-1 flex items-center justify-center my-0.5 relative z-10">
                 <WeatherIcon 
                   name={info.icon as any} 
-                  style={settings.iconStyle} 
+                  style="static" 
                   className="w-[28px] h-[28px]"
                   strokeWidth={1.8}
                 />
@@ -645,7 +514,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
               )}>
                 {formatTemp(item.temp, settings.unitTemp)}°
               </span>
-            </motion.div>
+            </div>
           );
         }) : (
           <div className="w-full py-8 text-center bg-app-surface border border-app-border rounded-[30px] opacity-40">
@@ -661,7 +530,7 @@ export function HourlyForecast({ weather, settings }: ForecastProps) {
   onOpenDetailed?: (initialIndex: number) => void;
 }
 
-export function DailyForecast({ weather, settings, onOpenDetailed }: DailyForecastProps) {
+function DailyForecastBase({ weather, settings, onOpenDetailed }: DailyForecastProps) {
   if (!weather || !weather.daily) return null;
 
   const minTemps = (weather?.daily?.temperatureMin || []).slice(0, 7);
@@ -672,7 +541,7 @@ export function DailyForecast({ weather, settings, onOpenDetailed }: DailyForeca
 
   return (
     <div className="flex flex-col px-0 -mx-[1rem] sm:-mx-[1.3125rem] daily-forecast">
-      <div className="w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative">
+      <div className="cv-auto w-[calc(100%-2rem)] max-w-[21.875rem] mx-auto bg-app-surface backdrop-blur-[32px] border border-app-border rounded-[2rem] py-[1.25rem] px-[1rem] sm:px-[1.375rem] flex flex-col gap-[1rem] overflow-hidden shadow-2xl relative">
         <div className="flex items-center justify-between select-none">
           <div className="flex items-center gap-1.5">
             <Icons.Calendar className="w-5 h-5 text-app-text/75" strokeWidth={1.4} />
@@ -723,7 +592,7 @@ export function DailyForecast({ weather, settings, onOpenDetailed }: DailyForeca
                   <div className="flex-1 flex justify-center">
                     <WeatherIcon 
                       name={info.icon as any} 
-                      style={settings.iconStyle} 
+                      style="static" 
                       className="w-6 h-6" 
                       strokeWidth={1.8}
                     />
@@ -750,7 +619,7 @@ export function DailyForecast({ weather, settings, onOpenDetailed }: DailyForeca
                 <div className="w-8 flex justify-center shrink-0">
                   <WeatherIcon 
                     name={info.icon as any} 
-                    style={settings.iconStyle} 
+                    style="static" 
                     className="w-6 h-6" 
                     strokeWidth={1.8}
                   />
@@ -797,3 +666,6 @@ const Icons = {
   Calendar: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar" {...props}><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>,
   Clock: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={props.strokeWidth || "1.4"} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-clock" {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
 };
+
+export const HourlyForecast = React.memo(HourlyForecastBase);
+export const DailyForecast = React.memo(DailyForecastBase);

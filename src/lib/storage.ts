@@ -14,14 +14,26 @@ export function getCityKey(location: Location): string {
     .toLowerCase();
 }
 
+let pendingWriteSeq = 0;
+
 export function saveWeatherData(locationKey: string, data: WeatherData) {
-  try {
-    const cacheRaw = localStorage.getItem(STORAGE_KEYS.WEATHER_CACHE);
-    const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
-    cache[locationKey] = { data, ts: Date.now() };
-    localStorage.setItem(STORAGE_KEYS.WEATHER_CACHE, JSON.stringify(cache));
-  } catch (e) {
-    console.error('Failed to save weather data to cache', e);
+  const seq = ++pendingWriteSeq;
+  const write = () => {
+    // Only the most recent save runs; stale saves are dropped to avoid redundant main-thread JSON work
+    if (seq !== pendingWriteSeq) return;
+    try {
+      const cacheRaw = localStorage.getItem(STORAGE_KEYS.WEATHER_CACHE);
+      const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
+      cache[locationKey] = { data, ts: Date.now() };
+      localStorage.setItem(STORAGE_KEYS.WEATHER_CACHE, JSON.stringify(cache));
+    } catch (e) {
+      console.error('Failed to save weather data to cache', e);
+    }
+  };
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(write, { timeout: 2000 });
+  } else {
+    setTimeout(write, 300);
   }
 }
 
